@@ -5,6 +5,8 @@ export interface Config {
   port: number;
   production: boolean;
   appOrigin: string | null;
+  /** Se definido, o primeiro acesso (criação do administrador) exige este código. */
+  setupCode: string | null;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -19,6 +21,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sessionSecret,
     port: Number(env.PORT ?? 3000),
     production: env.NODE_ENV === 'production',
-    appOrigin: env.APP_ORIGIN || null
+    appOrigin: env.APP_ORIGIN || null,
+    setupCode: env.SETUP_CODE || null
   };
 }

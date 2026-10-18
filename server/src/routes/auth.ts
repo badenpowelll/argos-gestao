@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import {Router} from 'express';
 import rateLimit from 'express-rate-limit';
@@ -22,12 +23,17 @@ export function authRoutes(db: Db, cfg: Config) {
   const userCount = async () => Number((await db.query('select count(*)::int as n from users')).rows[0].n);
 
   r.get('/status', asyncHandler(async (_req, res) => {
-    res.json({needs_setup: (await userCount()) === 0});
+    res.json({needs_setup: (await userCount()) === 0, setup_code_required: !!cfg.setupCode});
   }));
 
   // Primeiro acesso: só funciona enquanto não existir nenhum usuário.
   r.post('/setup', limiter, asyncHandler(async (req, res) => {
-    const body = parse(z.object({name: z.string().trim().min(2).max(120), email: z.string().trim().email().max(200), password: passwordSchema}), req.body);
+    const body = parse(z.object({name: z.string().trim().min(2).max(120), email: z.string().trim().email().max(200), password: passwordSchema, setup_code: z.string().max(200).optional()}), req.body);
+    if (cfg.setupCode) {
+      const a = Buffer.from(body.setup_code ?? '');
+      const b = Buffer.from(cfg.setupCode);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) throw new HttpError(403, 'Código de primeiro acesso incorreto', 'bad_setup_code');
+    }
     const hash = await bcrypt.hash(body.password, 12);
     const created = await db.query(
       `insert into users (name, email, password_hash, role)

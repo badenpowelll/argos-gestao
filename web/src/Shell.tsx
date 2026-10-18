@@ -26,6 +26,8 @@ export const Icon = ({name}: {name: string}) => (
 
 const NAV: {to: string; text: string; icon: string; roles?: string[]}[] = [
   {to: '/', text: 'Painel', icon: 'home'},
+  {to: '/propostas', text: 'Propostas', icon: 'file'},
+  {to: '/precificacao', text: 'Precificação', icon: 'wallet'},
   {to: '/pdv', text: 'PDV / Receber', icon: 'cash'},
   {to: '/cobrancas', text: 'Contas a receber', icon: 'receipt'},
   {to: '/clientes', text: 'Clientes', icon: 'users'},

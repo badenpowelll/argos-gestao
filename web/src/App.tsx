@@ -12,6 +12,8 @@ import {ChargesPage, PdvPage} from './pages/Receivables';
 import {ReportsPage} from './pages/Reports';
 import {ExpensesPage} from './pages/Expenses';
 import {AdminPage} from './pages/Admin';
+import {ProposalEditorPage, ProposalsPage} from './pages/Proposals';
+import {PricingAdminPage} from './pages/PricingAdmin';
 
 export function App() {
   const {user, ready} = useAuth();
@@ -21,6 +23,9 @@ export function App() {
     <Routes>
       <Route element={<Shell />}>
         <Route index element={<DashboardPage />} />
+        <Route path="propostas" element={<ProposalsPage />} />
+        <Route path="propostas/:id" element={<ProposalEditorPage />} />
+        <Route path="precificacao" element={<PricingAdminPage />} />
         <Route path="pdv" element={<PdvPage />} />
         <Route path="cobrancas" element={<ChargesPage />} />
         <Route path="clientes" element={<ClientsPage />} />
