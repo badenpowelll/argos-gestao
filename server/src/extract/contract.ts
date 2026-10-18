@@ -36,6 +36,8 @@ export interface ExtractedItem {
   status: FieldStatus;
   source: string;
   page: number | null;
+  /** 1º vencimento, quando o documento (JSON) o informa */
+  due_date?: string | null;
 }
 
 export interface Extraction {
@@ -134,21 +136,37 @@ function billingOf(s: string): Pick<ExtractedItem, 'billing_type' | 'installment
   if (/por\s+usu[aá]rio/i.test(s)) return {billing_type: 'por_usuario', installments: null, interval_months: 1, typed: true};
   if (/sob\s+demanda|por\s+hora|hora\s+t[eé]cnica/i.test(s)) return {billing_type: 'sob_demanda', installments: null, interval_months: 1, typed: true};
   if (/anual|por\s+ano|anuidade/i.test(s)) return {billing_type: 'recorrente', installments: null, interval_months: 12, typed: true};
-  if (/mensal|por\s+m[eê]s|mensalidade|mensalmente/i.test(s)) return {billing_type: 'recorrente', installments: null, interval_months: 1, typed: true};
+  if (/mensal|mensais|por\s+m[eê]s|mensalidade|mensalmente/i.test(s)) return {billing_type: 'recorrente', installments: null, interval_months: 1, typed: true};
   return {billing_type: 'unico', installments: null, interval_months: 1, typed: false};
+}
+
+/** Junta linhas quebradas pelo PDF no meio da frase (linha longa sem pontuação final + próxima começando em minúscula). */
+export function normalizeWraps(text: string): string {
+  const lines = text.replace(/\r/g, '').split('\n');
+  const out: string[] = [];
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const prev = out[out.length - 1];
+    if (prev !== undefined && prev.length > 40 && !/[.;:!?]$/.test(prev) && /^\s*(?:[a-zà-ú(%,]|R\$)/.test(line)) out[out.length - 1] = `${prev} ${line.trim()}`;
+    else out.push(line);
+  }
+  return out.join('\n');
 }
 
 export function extractContract(text: string, pages: string[] = [text]): Extraction {
   const issues: Extraction['issues'] = [];
   const fields: ExtractedField[] = [];
-  const full = text.replace(/\r/g, '');
+  const full = normalizeWraps(text);
   const sents = sentences(full);
   const f = (k: string, l: string, v: ExtractedField['value'], c: number, s: string | null, e?: Partial<ExtractedField>) =>
     fields.push(field(pages, k, l, v, c, s, e));
 
   // ---- tipo do documento
   let docKind: Extraction['document_kind'] = 'indefinido';
-  if (/termo\s+aditivo/i.test(full)) docKind = 'aditivo';
+  const top = full.slice(0, 400); // o título do documento define a natureza
+  if (/termo\s+aditivo/i.test(top)) docKind = 'aditivo';
+  else if (/proposta\s+comercial|^\s*proposta\b/i.test(top)) docKind = 'proposta';
+  else if (/termo\s+aditivo/i.test(full)) docKind = 'aditivo';
   else if (/CONTRATANTE/.test(full) && /CONTRATAD[AO]/.test(full)) docKind = 'contrato';
   else if (/proposta/i.test(full)) docKind = 'proposta';
   if (docKind === 'indefinido') issues.push({level: 'aviso', message: 'Não foi possível identificar se o documento é proposta, contrato ou aditivo. Classifique manualmente.'});
@@ -281,16 +299,88 @@ export function extractContract(text: string, pages: string[] = [text]): Extract
 
   // ---- setor público (opcional)
   const emp = full.match(/empenho\s*(?:n[ºo°.]*)?\s*:?\s*([\w./-]{3,30})/i);
-  const proc = full.match(/processo\s+(?:administrativo\s+)?(?:n[ºo°.]*)?\s*:?\s*(\d[\d./-]{3,30})/i);
-  f('commitment_number', 'Empenho', emp ? emp[1] ?? null : null, 0.5, emp?.[0] ?? null);
-  f('administrative_process', 'Processo administrativo', proc ? proc[1] ?? null : null, 0.5, proc?.[0] ?? null);
+  const proc = full.match(/processo\s+(?:administrativo\s+)?(?:n[ºo°.]*)?\s*:?\s*(\d[\w./-]{3,30})/i);
+  const trim = (v: string | undefined) => (v ? v.replace(/[.,;:]+$/, '') : null); // sem pontuação final da frase
+  f('commitment_number', 'Empenho', trim(emp?.[1]), 0.5, emp?.[0] ?? null);
+  f('administrative_process', 'Processo administrativo', trim(proc?.[1]), 0.5, proc?.[0] ?? null);
   const isPublic = /prefeitura|munic[ií]pio|secretaria|c[aâ]mara\s+municipal|fundo\s+municipal|governo\s+do\s+estado|autarquia|empenho|lei\s+(?:n[ºo°.]*\s*)?14\.133/i.test(full);
   f('is_public_flow', 'Fluxo de setor público', isPublic ? true : null, 0.5, isPublic ? (full.match(/prefeitura|munic[ií]pio|secretaria|empenho|14\.133/i)?.[0] ?? null) : null);
+
+  // ---- documentos no formato de PROPOSTA (gerados no Claude / modelos Argos): reconhece tabelas e identificação
+  const lastMoney = (s: string): number | null => {
+    const all = [...s.matchAll(MONEY)];
+    return all.length ? parseBRL((all[all.length - 1] as RegExpMatchArray)[0]) : null;
+  };
+  const setField = (key: string, label: string, value: ExtractedField['value'], conf: number, src: string | null) => {
+    const i = fields.findIndex((x) => x.key === key);
+    const nf = field(pages, key, label, value, conf, src);
+    if (i >= 0) fields[i] = nf;
+    else fields.push(nf);
+  };
+  const missing = (k: string) => (fields.find((x) => x.key === k)?.status ?? 'ausente') === 'ausente';
+
+  const cm = full.match(/(?:^|\n)\s*Cliente\s*:?\s*([^\n]+?)\s*(?:Data de emiss[aã]o|Validade|Endere[cç]o|CPF|CNPJ|Acesso|$)/im);
+  if (missing('client_name') && cm?.[1]) setField('client_name', 'Nome / razão social', clean(cm[1]), 0.7, cm[0]);
+  const pm = full.match(/PROPOSTA COMERCIAL\s*\n([^\n]{3,160})/);
+  if (pm) setField('project_name', 'Nome do sistema/projeto', clean(pm[1] as string), 0.6, pm[0]);
+  const addrM = full.match(/(?:^|\n)Endere[cç]o([^\n]+?)\s*(?:Validade|Data de emiss[aã]o|Acesso|$)/);
+  setField('client_address', 'Endereço do cliente', addrM?.[1] ? clean(addrM[1]) : null, 0.6, addrM?.[0] ?? null);
+  const issued = full.match(/Data de emiss[aã]o\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+  setField('issued_at', 'Data de emissão', issued ? parsePtDate(issued[1] as string) : null, 0.75, issued?.[0] ?? null);
+  const validity = full.match(/Validade\s*(\d{1,3})\s*dias/i);
+  setField('validity_days', 'Validade da proposta (dias)', validity ? Number(validity[1]) : null, 0.75, validity?.[0] ?? null);
+  const renew = full.match(/renov\w*\s+a\s+cada\s+(\d{1,2})\s+meses/i);
+  if (missing('term_months') && renew) setField('term_months', 'Vigência (meses)', Number(renew[1]), 0.5, renew[0]);
+
+  const scope = full.match(/OBJETO E ESCOPO\s*\n([\s\S]*?)\n\s*PRAZO E INFRAESTRUTURA/);
+  if (scope) {
+    const lines = (scope[1] as string).split('\n').map(clean).filter(Boolean);
+    if (missing('object') && lines[0]) setField('object', 'Objeto', lines[0], 0.7, lines[0]);
+    setField('scope', 'Escopo (módulos e funcionalidades)', lines.slice(1).join(' • ') || null, 0.65, lines.slice(0, 3).join(' '));
+  }
+  const infra = full.match(/PRAZO E INFRAESTRUTURA\s*\n([\s\S]*?)\n\s*(?:MENSALIDADE|INVESTIMENTO|MANUTEN[CÇ][AÃ]O)/); // títulos em CAIXA ALTA (sem /i)
+  if (infra) {
+    const txt = infra[1] as string;
+    const dl = txt.match(/(?:^|\n)Prazo\s*([^\n]+)/);
+    setField('deadline', 'Prazo de implantação', dl?.[1] ? clean(dl[1]) : null, 0.65, dl?.[0] ?? null);
+    const host = txt.match(/Hospedagem e banco\s*([\s\S]*?)(?=\nDom[ií]nio|$)/);
+    setField('hosting', 'Hospedagem e banco de dados', host?.[1] ? clean(host[1]) : null, 0.65, host?.[0] ?? null);
+    const dom = txt.match(/(?:^|\n)Dom[ií]nio\s*([\s\S]*)$/);
+    setField('domain_email', 'Domínio e e-mail', dom?.[1] ? clean(dom[1]).replace(/^e\s+e-mail\s*/i, '') : null, 0.65, dom?.[0] ?? null);
+  }
+  const hours = full.match(/(\d{1,4})\s*horas?\s+(?:de\s+)?(?:implementa|trabalho|desenvolvimento)/i);
+  setField('hours', 'Horas previstas', hours ? Number(hours[1]) : null, 0.55, hours?.[0] ?? null);
+  const clientPaid = sents.filter((s) => /pag[oa]s?\s+(?:diretamente\s+)?(?:pel[oa]\s+)?(?:cliente|loja)|fora\s+desta\s+precifica/i.test(s));
+  setField('client_paid_costs', 'Custos pagos diretamente pelo cliente (não cobrados pela Argos)', clientPaid.length ? clientPaid.join(' | ') : null, 0.6, clientPaid[0] ?? null);
+  const options = sents.filter((s) => /^Op[çc][aã]o\s*\d/i.test(s) || /^TOTAL (?:DA ENTRADA|NO CART[AÃ]O)|PARCELAS NO CART/i.test(s));
+  setField('payment_options', 'Opções de pagamento', options.length ? options.join(' | ') : null, 0.65, options[0] ?? null);
+  const payCond = sents.find((s) => /^Pagamento\s*:/i.test(s)) ?? sents.find((s) => /forma\s+de\s+pagamento/i.test(s) && s !== s.toUpperCase());
+  if (payCond) setField('payment_terms', 'Condições de pagamento', payCond, 0.6, payCond);
+  else if ((fields.find((x) => x.key === 'payment_terms')?.value as string | null)?.toUpperCase() === (fields.find((x) => x.key === 'payment_terms')?.value as string | null)) setField('payment_terms', 'Condições de pagamento', null, 0, null);
+
+  // resumo comercial (em vez de linhas soltas): valor do projeto, mensalidade, hora técnica
+  const projLine = sents.find((s) => /^VALOR\s+(?:TOTAL\s+)?DO\s+PROJETO/i.test(s) && lastMoney(s) !== null);
+  const moLine = sents.find((s) => /^MENSALIDADE\b(?!\s+A\s+PARTIR)/.test(s) && lastMoney(s) !== null);
+  const hrLine = sents.find((s) => /hora\s+t[eé]cnica/i.test(s) && lastMoney(s) !== null);
+  if (projLine || moLine) {
+    const summary: ExtractedItem[] = [];
+    const mk = (kind: string, description: string, billing: ExtractedItem['billing_type'], line: string, conf: number) =>
+      summary.push({kind, description, billing_type: billing, amount_cents: lastMoney(line) as number, quantity: 1, installments: null, interval_months: 1, confidence: conf, status: conf < 0.5 ? 'baixa_confianca' : 'ok', source: clip(line), page: pageOf(pages, line)});
+    if (projLine) mk('implementacao', 'Implantação e desenvolvimento do sistema', 'unico', projLine, 0.85);
+    if (moLine) mk('mensalidade', 'Mensalidade (inclui manutenção e suporte)', 'recorrente', moLine, 0.85);
+    if (hrLine) mk('suporte', 'Hora técnica (sob demanda)', 'sob_demanda', hrLine, 0.8);
+    items.splice(0, items.length, ...summary);
+    for (let i = issues.length - 1; i >= 0; i--) if (/valores diferentes|Nenhum valor monetário/.test(issues[i]!.message)) issues.splice(i, 1);
+    const entry = sents.find((s) => /^TOTAL DA ENTRADA/i.test(s) && lastMoney(s) !== null);
+    if (entry) setField('entry_total', 'Total da entrada (inclui a 1ª mensalidade)', (lastMoney(entry) as number) / 100, 0.8, entry);
+  }
 
   for (const k of ['client_document', 'client_name', 'signed_at', 'due_day'] as const) {
     const fld = fields.find((x) => x.key === k);
     if (fld?.status === 'ausente' && k !== 'client_document') issues.push({level: 'aviso', message: `Campo ausente no documento: ${fld.label}.`});
   }
+  // em propostas, o "Campo ausente: Nome" anterior pode ter sido resolvido acima
+  for (let i = issues.length - 1; i >= 0; i--) if (/Campo ausente.*Nome/.test(issues[i]!.message) && !missing('client_name')) issues.splice(i, 1);
 
   return {document_kind: docKind, fields, items, issues, text_length: full.length, pages: pages.length};
 }

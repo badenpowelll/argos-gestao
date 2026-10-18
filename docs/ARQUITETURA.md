@@ -1,4 +1,4 @@
-﻿# ARGOS GESTÃO 360° — arquitetura e estado do projeto
+# ARGOS GESTÃO 360° — arquitetura e estado do projeto
 
 > Documento para quem for revisar/consultar o projeto (engenharia, finanças, contabilidade). Atualizado em 18/10/2026.
 > Regra do projeto: **nada é declarado pronto sem estar implementado e validado**. Esta página separa o que está validado do que está pendente.
@@ -35,7 +35,7 @@ brand/       logomarca, favicon e brandbooks oficiais
 - **Proposta ≠ contrato:** propostas nunca geram cobrança; contrato só gera após **ativação confirmada** (data de assinatura obrigatória).
 - **Importação com revisão humana:** o PDF/DOCX é lido, cada campo mostra origem, página e confiança; **nada é gravado antes da confirmação**. Campo ausente fica ausente (nunca presumido). Original preservado (hash SHA-256, armazenamento privado em `bytea`).
 - **Versão de proposta emitida é congelada** (trigger): custos, câmbio e tributação posteriores não alteram propostas já emitidas.
-- Testes: `npm test` (103 testes; usam um *schema* descartável no Postgres, nunca os dados reais).
+- Testes: `npm test` (126 testes; usam um *schema* descartável no Postgres, nunca os dados reais).
 
 ## 3. Módulo Argos Pricing — regras de cálculo
 
@@ -49,7 +49,10 @@ brand/       logomarca, favicon e brandbooks oficiais
 - **Referência de validação:** o motor reproduz exatamente a proposta PDV ATEC (custos R$ 1.081,44 → projeto R$ 1.351,80 → entrada R$ 1.499,80 → cartão R$ 3.497,48 → 10 × R$ 349,75) e a AH Crédito (preço R$ 400,00 com alerta de prejuízo). Ver `server/src/pricing/*.test.ts`.
 - Visão do cliente: margem, tributos, rateios e tabelas de custo só aparecem com **autorização expressa** na proposta.
 
-## 4. Fluxos principais
+## 4. Fluxo principal (simplificado)
+
+A precificação é feita no **Claude**; o ARGOS recebe, reconhece e cadastra. Menu: **Importar proposta** (ação principal) · Visão geral · Clientes · Propostas e contratos · Financeiro · Configurações (o restante, incl. o módulo de precificação interno, fica em Configurações). Detalhes em `docs/IMPORTACAO.md`.
+
 
 1. **Importar contrato → revisar → confirmar → cliente/sistema/contrato (rascunho) → ativar → cobranças → PDV (receber/baixar) → painel.**
 2. **Proposta:** criar → calcular (simulação ao vivo) → salvar rascunho → emitir (congela + PDF oficial) → [nova versão se mudar] → aprovar → **contrato em rascunho + sistema + cliente vinculado** → ativar → cobranças no PDV.
@@ -58,6 +61,7 @@ brand/       logomarca, favicon e brandbooks oficiais
 
 | Área | Estado |
 |---|---|
+| Importar proposta (PDF/DOCX/TXT/JSON do Claude) → conferir → cadastrar → **Aprovar e gerar cobranças** | ✅ testado (15 contratos fictícios + 2 propostas reais reconhecidos) |
 | Clientes, sistemas, contratos, itens, aditivos | ✅ implementado e testado |
 | Importação PDF/DOCX/TXT com revisão | ✅ (PDF digitalizado/imagem **não** tem OCR: preenchimento manual) |
 | Cobranças, recorrência, PDV, estorno, juros/multa/desconto | ✅ testado |
@@ -91,7 +95,7 @@ npm install
 cp .env.example .env      # preencher DATABASE_URL e SESSION_SECRET
 npm run migrate           # aplica as migrações
 npm run dev               # API :3000 + front :5173
-npm test                  # 103 testes (precisa de DATABASE_URL)
+npm test                  # 126 testes (precisa de DATABASE_URL)
 npm run build && npm start
 ```
 Produção: Railway (`railway up`), variáveis `DATABASE_URL` (referência ao Postgres), `SESSION_SECRET`, `NODE_ENV=production`, `DB_SSL=false`, `SETUP_CODE`.

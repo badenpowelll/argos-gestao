@@ -5,6 +5,7 @@ interface AuthState {
   user: User | null;
   needsSetup: boolean;
   setupCodeRequired: boolean;
+  demo: boolean;
   ready: boolean;
   login: (email: string, password: string) => Promise<void>;
   setup: (name: string, email: string, password: string, setupCode?: string) => Promise<void>;
@@ -23,6 +24,11 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [setupCodeRequired, setSetupCodeRequired] = useState(false);
   const [ready, setReady] = useState(false);
+  const [demo, setDemo] = useState(false);
+
+  useEffect(() => {
+    api.get<{demo?: boolean}>('/health').then((h) => setDemo(!!h.demo)).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -47,6 +53,6 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
   }, []);
   const logout = useCallback(async () => { await api.post('/auth/logout'); setUser(null); }, []);
   const can = useCallback((...roles: User['role'][]) => !!user && roles.includes(user.role), [user]);
-  const value = useMemo(() => ({user, needsSetup, setupCodeRequired, ready, login, setup, logout, can}), [user, needsSetup, setupCodeRequired, ready, login, setup, logout, can]);
+  const value = useMemo(() => ({user, needsSetup, setupCodeRequired, demo, ready, login, setup, logout, can}), [user, needsSetup, setupCodeRequired, demo, ready, login, setup, logout, can]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

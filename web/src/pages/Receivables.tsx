@@ -219,7 +219,9 @@ export function ChargesPage() {
   const totals = useMemo(() => (data ?? []).reduce((s, c) => s + (c.status === 'cancelada' ? 0 : c.balance_cents), 0), [data]);
   return (
     <div className="stack-lg">
-      <PageHeader title="Contas a receber" subtitle="Cobranças futuras, pendentes, vencidas, parciais e pagas" actions={can('admin', 'financeiro') && <Button onClick={() => setCreating(true)}>Cobrança avulsa</Button>} />
+      <PageHeader title="Financeiro" subtitle="Cobranças a receber, vencidas e pagas. Clique no cliente para receber ou dar baixa." actions={<>
+        <RLink to="/pdv" className="ads-btn ads-btn--primary" style={{textDecoration: 'none'}}>Modo caixa (receber)</RLink>
+        {can('admin', 'financeiro') && <Button variant="outline" onClick={() => setCreating(true)}>Cobrança avulsa</Button>}</>} />
       <div className="chips" role="group" aria-label="Filtro de situação">
         {VIEWS.map(([v, text]) => <Button key={v || 'todas'} size="sm" variant={view === v ? 'secondary' : 'outline'} aria-pressed={view === v} onClick={() => setSp(v ? {view: v} : {view: ''})}>{text}</Button>)}
       </div>

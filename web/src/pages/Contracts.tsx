@@ -54,9 +54,9 @@ export function ContractsPage() {
   const {data, error, loading} = useLoad(() => api.get<Row[]>(`/contracts${qs({status, kind})}`), [status, kind]);
   return (
     <div className="stack-lg">
-      <PageHeader title="Contratos" subtitle="Propostas, contratos assinados e aditivos" actions={can('admin', 'financeiro', 'operador') && <>
-        <RLink to="/importar" className="ads-btn ads-btn--secondary" style={{textDecoration: 'none'}}>Importar PDF</RLink>
-        <Button onClick={() => setCreating(true)}>Novo contrato</Button></>} />
+      <PageHeader title="Propostas e contratos" subtitle="Tudo o que foi importado ou cadastrado, com a situação de cada um" actions={can('admin', 'financeiro', 'operador') && <>
+        <RLink to="/importar" className="ads-btn ads-btn--primary" style={{textDecoration: 'none'}}>Importar proposta</RLink>
+        <Button variant="outline" onClick={() => setCreating(true)}>Criar manualmente</Button></>} />
       <div className="filters">
         <Select label="Natureza" value={kind} placeholder="Todas" onChange={(e) => setKind(e.target.value)} options={[{value: 'contrato', label: 'Contrato'}, {value: 'proposta', label: 'Proposta'}, {value: 'aditivo', label: 'Aditivo'}]} />
         <Select label="Situação" value={status} placeholder="Todas" onChange={(e) => setStatus(e.target.value)} options={['rascunho', 'proposta', 'ativo', 'suspenso', 'encerrado', 'cancelado'].map((s) => ({value: s, label: label(s)}))} />
@@ -88,7 +88,9 @@ export function ContractDetailPage() {
   const {can} = useAuth();
   const {toast} = useToast();
   const [tab, setTab] = useState('itens');
-  const [dlg, setDlg] = useState<'activate' | 'approve' | 'generate' | 'suspend' | 'close' | 'cancel' | 'item' | null>(null);
+  const [dlg, setDlg] = useState<'activate' | 'approve' | 'approveact' | 'generate' | 'suspend' | 'close' | 'cancel' | 'item' | null>(null);
+  const [act, setAct] = useState({signed: '', entry: '', monthly: '', day: ''});
+  const [actErr, setActErr] = useState<string | null>(null);
   const [signed, setSigned] = useState('');
   const [newItem, setNewItem] = useState<ItemForm>(emptyItem());
   const {data, error, loading, reload} = useLoad(() => api.get<Detail>(`/contracts/${id}`), [id]);
@@ -103,14 +105,19 @@ export function ContractDetailPage() {
   return (
     <div className="stack-lg">
       <PageHeader title={c.number} subtitle={`${label(c.kind)} · ${c.client_name}`} actions={<>
-        {finance && isProposal && c.status === 'proposta' && <Button onClick={() => setDlg('approve')}>Aprovar proposta</Button>}
-        {finance && !isProposal && (c.status === 'rascunho' || c.status === 'suspenso') && <Button onClick={() => setDlg('activate')}>Ativar e gerar cobranças</Button>}
-        {finance && c.status === 'ativo' && <Button variant="outline" onClick={() => setDlg('generate')}>Gerar próximas cobranças</Button>}
-        {finance && c.status === 'ativo' && <Button variant="outline" onClick={() => setDlg('suspend')}>Suspender</Button>}
-        {finance && ['ativo', 'suspenso'].includes(String(c.status)) && <Button variant="outline" onClick={() => setDlg('close')}>Encerrar</Button>}
-        {finance && !['encerrado', 'cancelado'].includes(String(c.status)) && <Button variant="danger" onClick={() => setDlg('cancel')}>Cancelar</Button>}
+        {/* uma ação principal por situação; o restante fica em "Mais ações" */}
+        {finance && ['proposta', 'rascunho', 'suspenso'].includes(String(c.status)) && <Button onClick={() => { setAct({signed: String(c.signed_at ?? '') || new Date().toISOString().slice(0, 10), entry: '', monthly: '', day: ''}); setDlg('approveact'); }}>{isProposal ? 'Aprovar e gerar cobranças' : 'Ativar e gerar cobranças'}</Button>}
+        {finance && !['encerrado', 'cancelado'].includes(String(c.status)) && (
+          <details className="more"><summary className="ads-btn ads-btn--outline">Mais ações</summary>
+            <div className="more__menu">
+              {c.status === 'ativo' && <Button variant="outline" onClick={() => setDlg('generate')}>Gerar próximas cobranças</Button>}
+              {c.status === 'ativo' && <Button variant="outline" onClick={() => setDlg('suspend')}>Suspender</Button>}
+              {['ativo', 'suspenso'].includes(String(c.status)) && <Button variant="outline" onClick={() => setDlg('close')}>Encerrar</Button>}
+              <Button variant="danger" onClick={() => setDlg('cancel')}>Cancelar {isProposal ? 'proposta' : 'contrato'}</Button>
+            </div>
+          </details>)}
       </>} />
-      {isProposal && <Alert tone="info" title="Esta é uma proposta">Propostas não geram cobranças. Aprove-a (informando a data de aceite) para convertê-la em contrato e então ative.</Alert>}
+      {isProposal && <Alert tone="info" title="Esta é uma proposta">Ainda não gera cobranças. Quando o cliente aprovar, clique em “Aprovar e gerar cobranças”.</Alert>}
       {c.status === 'rascunho' && !isProposal && <Alert tone="warning" title="Contrato em rascunho">Nenhuma cobrança foi criada. Confira itens, vencimentos e data de assinatura antes de ativar.</Alert>}
       <div className="kpis">
         <Card className="kpi"><p className="muted">Situação</p><Status value={String(c.status)} /></Card>
@@ -122,6 +129,7 @@ export function ContractDetailPage() {
         <p>{(c.object as string) || '—'}</p>
         <p className="muted">Pagamento: {(c.payment_terms as string) || '—'} · Vencimento dia {String(c.due_day ?? '—')} · Reajuste: {(c.adjustment_index as string) || '—'}</p>
         {c.is_public_flow && <p className="muted">Processo: {(c.administrative_process as string) || '—'} · Empenho: {(c.commitment_number as string) || '—'}</p>}
+        {c.notes && <details open><summary>Escopo, prazos e observações do documento</summary><p style={{whiteSpace: 'pre-wrap'}}>{String(c.notes)}</p></details>}
       </Card>
       <Tabs label="Seções do contrato" idPrefix="ctr" value={tab} onChange={setTab} items={[{id: 'itens', label: 'Itens'}, {id: 'cobrancas', label: 'Cobranças'}, {id: 'historico', label: 'Histórico'}, {id: 'docs', label: 'Documentos'}]} />
       {tab === 'itens' && (<>
@@ -146,6 +154,26 @@ export function ContractDetailPage() {
           columns={[{key: 'filename', header: 'Arquivo', render: (r) => <a className="ads-link" href={`/api/documents/${r.id}`}>{r.filename}</a>}, {key: 'kind', header: 'Tipo', render: (r) => (r.kind === 'contrato_original' ? 'Original importado' : 'Anexo')}, {key: 'size', header: 'Tamanho', render: (r) => `${Math.round(r.size_bytes / 1024)} KB`}, {key: 'created_at', header: 'Enviado em', render: (r) => dateTimeBR(r.created_at)}]} />
       </>)}
 
+      <Dialog open={dlg === 'approveact'} onClose={() => setDlg(null)} title={isProposal ? 'Aprovar proposta e gerar cobranças' : 'Ativar e gerar cobranças'}>
+        <form className="dialog-body" onSubmit={async (e) => {
+          e.preventDefault(); setActErr(null);
+          try {
+            const r = await api.post<{created: number}>(`/contracts/${id}/approve-and-activate`, {confirm: true, signed_at: act.signed, entry_due_date: act.entry || null, monthly_first_due_date: act.monthly || null, due_day: act.day ? Number(act.day) : null});
+            await done(`${isProposal ? 'Proposta aprovada' : 'Contrato ativo'} — ${r.created} cobrança(s) gerada(s)`);
+          } catch (x) { setActErr((x as Error).message); }
+        }}>
+          <p>Confirma que o cliente aprovou? Serão criadas as cobranças conforme os valores abaixo.</p>
+          <ul>{data.items.filter((i) => i.active).map((i) => <li key={i.id}>{i.description}: <Money cents={Math.round(i.unit_amount_cents * i.quantity)} /> — {label(i.billing_type)}{i.first_due_date ? `, 1º venc. ${dateBR(i.first_due_date)}` : ''}</li>)}</ul>
+          <div className="form-grid">
+            <Input label={isProposal ? 'Data de aprovação / assinatura' : 'Data de assinatura'} type="date" required value={act.signed} onChange={(e) => setAct({...act, signed: e.target.value})} />
+            {data.items.some((i) => i.active && !i.first_due_date && ['unico', 'parcelado'].includes(i.billing_type)) && <Input label="Vencimento do valor inicial" type="date" required value={act.entry} onChange={(e) => setAct({...act, entry: e.target.value})} />}
+            {data.items.some((i) => i.active && !i.first_due_date && ['recorrente', 'por_usuario'].includes(i.billing_type)) && <Input label="1º vencimento da mensalidade" type="date" required value={act.monthly} onChange={(e) => setAct({...act, monthly: e.target.value})} />}
+            <Input label="Dia fixo de vencimento (opcional)" type="number" min={1} max={31} value={act.day} onChange={(e) => setAct({...act, day: e.target.value})} />
+          </div>
+          <ErrorNote error={actErr} />
+          <div className="dialog-actions"><Button variant="outline" onClick={() => setDlg(null)}>Voltar</Button><Button type="submit">Confirmar e gerar cobranças</Button></div>
+        </form>
+      </Dialog>
       <ConfirmDialog open={dlg === 'activate'} title="Ativar contrato e gerar cobranças" confirmLabel="Confirmar ativação" onClose={() => setDlg(null)}
         onConfirm={async () => { const r = await api.post<{created: number}>(`/contracts/${id}/activate`, {confirm: true}); await done(`Contrato ativo — ${r.created} cobrança(s) gerada(s)`); }}>
         <p>Você confirma que os <strong>{data.items.filter((i) => i.active).length} item(ns)</strong>, valores e vencimentos conferem com o contrato assinado? Serão criadas as cobranças (únicas, parcelas e mensalidades dos próximos 12 meses).</p>

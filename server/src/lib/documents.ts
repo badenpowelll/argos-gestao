@@ -33,6 +33,21 @@ export function isValidCnpj(input: string): boolean {
   return true;
 }
 
+/** Completa os dígitos verificadores (usado em dados FICTÍCIOS de demonstração). */
+export function completeCnpj(base12: string): string {
+  const calc = (s: string, w: number[]) => {
+    const r = s.split('').reduce((a, d, i) => a + Number(d) * (w[i] as number), 0) % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  const d1 = calc(base12, [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return `${base12}${d1}${calc(base12 + d1, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])}`;
+}
+export function completeCpf(base9: string): string {
+  const calc = (s: string) => ((s.split('').reduce((a, d, i) => a + Number(d) * (s.length + 1 - i), 0) * 10) % 11) % 10;
+  const d1 = calc(base9);
+  return `${base9}${d1}${calc(base9 + d1)}`;
+}
+
 export function isValidDocument(input: string): boolean {
   const n = onlyDigits(input).length;
   return n === 11 ? isValidCpf(input) : n === 14 ? isValidCnpj(input) : false;

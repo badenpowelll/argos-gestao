@@ -24,19 +24,13 @@ export const Icon = ({name}: {name: string}) => (
   </svg>
 );
 
+// Navegação enxuta: o dia a dia cabe em 5 itens + 1 ação principal. O resto fica em Configurações.
 const NAV: {to: string; text: string; icon: string; roles?: string[]}[] = [
-  {to: '/', text: 'Painel', icon: 'home'},
-  {to: '/propostas', text: 'Propostas', icon: 'file'},
-  {to: '/precificacao', text: 'Precificação', icon: 'wallet'},
-  {to: '/pdv', text: 'PDV / Receber', icon: 'cash'},
-  {to: '/cobrancas', text: 'Contas a receber', icon: 'receipt'},
+  {to: '/', text: 'Visão geral', icon: 'home'},
   {to: '/clientes', text: 'Clientes', icon: 'users'},
-  {to: '/contratos', text: 'Contratos', icon: 'file'},
-  {to: '/importar', text: 'Importar contrato', icon: 'upload'},
-  {to: '/sistemas', text: 'Sistemas', icon: 'box'},
-  {to: '/despesas', text: 'Despesas', icon: 'wallet'},
-  {to: '/relatorios', text: 'Relatórios', icon: 'chart'},
-  {to: '/admin', text: 'Administração', icon: 'shield', roles: ['admin', 'financeiro']}
+  {to: '/contratos', text: 'Propostas e contratos', icon: 'file'},
+  {to: '/financeiro', text: 'Financeiro', icon: 'cash'},
+  {to: '/configuracoes', text: 'Configurações', icon: 'shield'}
 ];
 
 function Brand() {
@@ -53,18 +47,20 @@ function Nav({onNavigate}: {onNavigate?: () => void}) {
   const {user, can} = useAuth();
   return (
     <nav aria-label="Menu principal" className="nav">
+      {can('admin', 'financeiro', 'operador') && (
+        <NavLink to="/importar" onClick={onNavigate} className={({isActive}) => `nav__cta${isActive ? ' is-active' : ''}`}><Icon name="upload" /> <span>Importar proposta</span></NavLink>
+      )}
       {NAV.filter((n) => !n.roles || (user && n.roles.includes(user.role))).map((n) => (
         <NavLink key={n.to} to={n.to} end={n.to === '/'} onClick={onNavigate} className={({isActive}) => `nav__item${isActive ? ' is-active' : ''}`}>
           <Icon name={n.icon} /> <span>{n.text}</span>
         </NavLink>
       ))}
-      {can('admin') && null}
     </nav>
   );
 }
 
 export function Shell() {
-  const {user, logout} = useAuth();
+  const {user, logout, demo} = useAuth();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(getStoredTheme());
   const loc = useLocation();
@@ -74,6 +70,7 @@ export function Shell() {
   return (
     <div className="shell">
       <a href="#main" className="skip-link">Ir para o conteúdo</a>
+      {demo && <div className="demo-banner" role="status">AMBIENTE DE DEMONSTRAÇÃO — todos os dados são fictícios e não representam clientes, contratos ou valores reais.</div>}
       <aside className="sidebar">
         <Brand />
         <Nav />

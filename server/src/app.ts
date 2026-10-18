@@ -59,7 +59,7 @@ export function createApp(db: Db, cfg: Config) {
   app.get('/api/health', async (_req, res) => {
     try {
       await db.query('select 1');
-      res.json({ok: true});
+      res.json({ok: true, demo: process.env.DEMO_MODE === 'true'});
     } catch {
       res.status(503).json({ok: false});
     }

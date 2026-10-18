@@ -14,6 +14,7 @@ import {ExpensesPage} from './pages/Expenses';
 import {AdminPage} from './pages/Admin';
 import {ProposalEditorPage, ProposalsPage} from './pages/Proposals';
 import {PricingAdminPage} from './pages/PricingAdmin';
+import {SettingsHubPage} from './pages/SettingsHub';
 
 export function App() {
   const {user, ready} = useAuth();
@@ -23,6 +24,8 @@ export function App() {
     <Routes>
       <Route element={<Shell />}>
         <Route index element={<DashboardPage />} />
+        <Route path="financeiro" element={<ChargesPage />} />
+        <Route path="configuracoes" element={<SettingsHubPage />} />
         <Route path="propostas" element={<ProposalsPage />} />
         <Route path="propostas/:id" element={<ProposalEditorPage />} />
         <Route path="precificacao" element={<PricingAdminPage />} />

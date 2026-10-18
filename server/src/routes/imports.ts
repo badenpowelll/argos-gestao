@@ -4,6 +4,7 @@ import {audit} from '../audit.js';
 import {WRITERS, actorOf, requireRole} from '../auth.js';
 import {withTx, type Db} from '../db.js';
 import {extractContract, type Extraction} from '../extract/contract.js';
+import {extractFromJson} from '../extract/json.js';
 import {extractText} from '../extract/text.js';
 import {HttpError, asyncHandler, parse} from '../http.js';
 import {uuid} from '../lib/sql.js';
@@ -34,7 +35,9 @@ export function importRoutes(db: Db) {
       const dup = await tx.query('select id, filename from documents where sha256 = $1 and id <> $2 limit 1', [doc.sha256, doc.id]);
       const {text, pages} = await extractText(req.file!.buffer, type);
       let extraction: Extraction;
-      if (text.trim().length < 40) {
+      if (type === 'json') {
+        extraction = extractFromJson(JSON.parse(text.replace(/^﻿/, '')));
+      } else if (text.trim().length < 40) {
         extraction = {
           document_kind: 'indefinido', fields: [], items: [], text_length: text.length, pages: pages.length,
           issues: [{level: 'erro', message: 'O arquivo não contém texto legível (provavelmente um PDF digitalizado). Preencha os dados manualmente na revisão; o original foi preservado.'}]
@@ -74,6 +77,7 @@ export function importRoutes(db: Db) {
       req.body
     );
     if (!body.client_id && !body.client) throw new HttpError(422, 'Selecione um cliente existente ou informe os dados do novo cliente');
+    if (body.client_id && body.client) body.client.document = body.client.document ?? null;
 
     const out = await withTx(db, async (tx) => {
       const imp = (await tx.query('select * from contract_imports where id = $1 for update', [id])).rows[0];
@@ -89,6 +93,16 @@ export function importRoutes(db: Db) {
         else {
           clientId = (await insertClient(tx, actor, body.client!)).id as string;
           created = true;
+        }
+      }
+      // cliente existente: completa SOMENTE campos em branco com o que veio do documento (nunca sobrescreve dados já cadastrados)
+      if (!created && body.client) {
+        const blanks = ['document', 'email', 'phone', 'whatsapp', 'street', 'responsible_name', 'trade_name', 'sector'] as const;
+        const cur = (await tx.query('select * from clients where id = $1', [clientId])).rows[0];
+        const fill = blanks.filter((k) => !cur[k] && body.client![k]);
+        if (fill.length) {
+          await tx.query(`update clients set ${fill.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = now() where id = $1`, [clientId, ...fill.map((k) => body.client![k])]);
+          await audit(tx, actor, 'client.fill_from_import', 'client', clientId, {filled: fill, import: id});
         }
       }
       let systemId: string | null = null;

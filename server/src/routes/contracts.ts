@@ -234,6 +234,47 @@ export function contractRoutes(db: Db) {
     res.json(rows[0]);
   }));
 
+  // Atalho do dia a dia: aprova a proposta (se for proposta), completa vencimentos e ATIVA gerando as cobranças — numa só transação.
+  r.post('/:id/approve-and-activate', requireRole(...FINANCE), asyncHandler(async (req, res) => {
+    const id = parse(uuid, req.params.id);
+    const b = parse(z.object({
+      confirm: z.literal(true, {errorMap: () => ({message: 'Confirmação explícita obrigatória'})}),
+      signed_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      entry_due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+      monthly_first_due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+      due_day: z.number().int().min(1).max(31).nullish()
+    }), req.body);
+    for (const d of [b.signed_at, b.entry_due_date, b.monthly_first_due_date]) if (d && !isValidIsoDate(d)) throw new HttpError(422, 'Data inválida');
+    const actor = actorOf(req);
+    const out = await withTx(db, async (tx) => {
+      const c = (await tx.query('select * from contracts where id = $1 for update', [id])).rows[0];
+      if (!c) throw new HttpError(404, 'Contrato não encontrado');
+      if (['ativo', 'encerrado', 'cancelado'].includes(c.status)) throw new HttpError(409, `Documento com status "${c.status}" não pode ser aprovado/ativado`);
+      if (c.kind === 'proposta') {
+        await tx.query("update contracts set kind = 'contrato', status = 'rascunho', signed_at = $2, approved_at = now(), number = replace(number, 'PRP-', 'CTR-'), updated_at = now() where id = $1", [id, b.signed_at]);
+        await audit(tx, actor, 'contract.approve_proposal', 'contract', id, {signed_at: b.signed_at, via: 'approve-and-activate'});
+      } else if (!c.signed_at) {
+        await tx.query('update contracts set signed_at = $2 where id = $1', [id, b.signed_at]);
+      }
+      const items = (await tx.query<ItemRow>('select * from contract_items where contract_id = $1 and active', [id])).rows;
+      if (!items.length) throw new HttpError(422, 'O documento não possui itens de cobrança', 'no_items');
+      for (const it of items) {
+        if (it.first_due_date || it.billing_type === 'sob_demanda') continue;
+        const date = it.billing_type === 'unico' || it.billing_type === 'parcelado' ? b.entry_due_date : b.monthly_first_due_date;
+        if (!date) throw new HttpError(422, `Informe o vencimento de "${it.description}"`, 'missing_due_date');
+        await tx.query('update contract_items set first_due_date = $2 where id = $1', [it.id, date]);
+      }
+      if (b.due_day) await tx.query('update contracts set due_day = $2 where id = $1', [id, b.due_day]);
+      const fresh = (await tx.query('select * from contracts where id = $1', [id])).rows[0];
+      const planItems = (await tx.query<ItemRow>('select * from contract_items where contract_id = $1 and active', [id])).rows;
+      for (const it of planItems) planItemCharges(it, {horizon: today(), contractStart: fresh.start_date, contractEnd: fresh.end_date, dueDay: fresh.due_day});
+      await tx.query("update contracts set status = 'ativo', activated_at = now(), activated_by = $2, updated_at = now() where id = $1", [id, actor.id]);
+      await audit(tx, actor, 'contract.activate', 'contract', id, {items: planItems.length, via: 'approve-and-activate'});
+      return generateCharges(tx, id, actor);
+    });
+    res.json({status: 'ativo', ...out});
+  }));
+
   r.post('/:id/activate', requireRole(...FINANCE), asyncHandler(async (req, res) => {
     const id = parse(uuid, req.params.id);
     const b = parse(z.object({confirm: z.literal(true, {errorMap: () => ({message: 'Confirmação explícita obrigatória'})}), generate: z.boolean().default(true)}), req.body);

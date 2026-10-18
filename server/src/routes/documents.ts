@@ -14,7 +14,7 @@ export async function storeDocument(
   db: Db | Tx,
   file: {buffer: Buffer; originalname: string},
   meta: {kind: 'contrato_original' | 'comprovante' | 'anexo'; userId: string; clientId?: string | null; contractId?: string | null},
-  allow: (keyof typeof ALLOWED)[] = ['pdf', 'docx', 'txt']
+  allow: (keyof typeof ALLOWED)[] = ['pdf', 'docx', 'txt', 'json']
 ) {
   const type = sniff(file.buffer);
   if (!type || !allow.includes(type)) throw new HttpError(415, `Tipo de arquivo não permitido (aceitos: ${allow.join(', ')})`, 'bad_file_type');

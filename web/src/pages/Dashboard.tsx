@@ -1,4 +1,4 @@
-import {useState} from 'react';
+﻿import {useState} from 'react';
 import {Link as RLink} from 'react-router-dom';
 import {Alert, Card, Input, MetricCard, Select} from '../ds';
 import {api, qs} from '../api';
@@ -37,7 +37,7 @@ export function DashboardPage() {
 
   return (
     <div className="stack-lg">
-      <PageHeader title="Painel" subtitle={data ? `Período: ${dateBR(data.period.from)} a ${dateBR(data.period.to)}` : undefined} />
+      <PageHeader title="Visão geral" subtitle={data ? `Período: ${dateBR(data.period.from)} a ${dateBR(data.period.to)}` : undefined} actions={<RLink to="/importar" className="ads-btn ads-btn--primary" style={{textDecoration: 'none'}}>Importar proposta</RLink>} />
       <div className="filters">
         <Select label="Período" value={preset} onChange={(e) => setPreset(e.target.value)} options={[
           {value: 'mes', label: 'Mês atual'}, {value: 'mes_anterior', label: 'Mês anterior'}, {value: 'trimestre', label: 'Últimos 3 meses'},
@@ -51,7 +51,7 @@ export function DashboardPage() {
       {loading && !data ? <Loading /> : data && (<>
         {data.overdue_count > 0 && (
           <Alert tone="danger" title={`${data.overdue_count} cobrança(s) vencida(s) — ${brl(data.overdue_cents)}`}>
-            {data.overdue_clients} cliente(s) em atraso. <RLink to="/cobrancas?view=vencidas">Ver vencidas</RLink>
+            {data.overdue_clients} cliente(s) em atraso. <RLink to="/financeiro?view=vencidas">Ver vencidas</RLink>
           </Alert>
         )}
         <div className="kpis">
@@ -61,18 +61,9 @@ export function DashboardPage() {
           <MetricCard label="Recebido no período" value={brl(data.received_cents)} description={`Implementação: ${brl(data.implementation_received_cents)}`} />
           <MetricCard label="A receber (não vencido)" value={brl(data.pending_cents)} description={`${data.pending_count} cobrança(s)`} />
           <MetricCard label="Em atraso" value={brl(data.overdue_cents)} description={`Inadimplência: ${String(data.delinquency_rate).replace('.', ',')}% do devido até hoje`} />
-          <MetricCard label="Despesas + infraestrutura" value={brl(data.expenses_cents + data.infra_cost_cents)} description={`Despesas ${brl(data.expenses_cents)} · infra ${brl(data.infra_cost_cents)}`} />
-          <MetricCard label="Resultado do período" value={brl(data.result_cents)} description="Recebido − despesas − infraestrutura" />
         </div>
 
-        <div className="two-col">
-          <Card title="Cobrado × recebido — últimos 12 meses"><BarChart series={data.series} /></Card>
-          <Card title="Recebido por forma de pagamento">
-            {data.by_method.length === 0 ? <p className="muted">Nenhum recebimento no período.</p> : (
-              <ul className="list">{data.by_method.map((m) => <li key={m.method}><span>{label(m.method)}</span><Money cents={m.v} strong /></li>)}</ul>
-            )}
-          </Card>
-        </div>
+        <Card title="Cobrado × recebido — últimos 12 meses"><BarChart series={data.series} /></Card>
 
         <div className="two-col">
           <Card title="Maiores saldos em atraso">
@@ -86,12 +77,8 @@ export function DashboardPage() {
               <ul className="list">{data.upcoming.map((c) => <li key={c.id}><span>{dateBR(c.due_date)} · {c.client_name}<br /><small className="muted">{c.description}</small></span><Money cents={c.balance_cents} /></li>)}</ul>)}
           </Card>
         </div>
-        <Card title="Contratos terminando em 60 dias">
-          {data.contracts_ending.length === 0 ? <p className="muted">Nenhum contrato próximo do fim da vigência.</p> : (
-            <ul className="list">{data.contracts_ending.map((c) => <li key={c.id}><RLink to={`/contratos/${c.id}`}>{c.number} · {c.client_name}</RLink><span>{dateBR(c.end_date)}</span></li>)}</ul>)}
-        </Card>
-        <p className="muted" style={{fontSize: '.8rem'}}>{data.notes.infra}</p>
       </>)}
     </div>
   );
 }
+

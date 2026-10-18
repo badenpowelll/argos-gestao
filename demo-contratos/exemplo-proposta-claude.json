@@ -1,0 +1,46 @@
+{
+  "schema": "argos-proposta/1",
+  "tipo": "proposta",
+  "cliente": {
+    "nome": "Mercearia Estrela do Mar Ltda",
+    "documento": "99.000.137/0001-03",
+    "tipo": "empresa_privada",
+    "email": "contato@estreladomar.example.com",
+    "telefone": "(84) 3222-0000",
+    "whatsapp": "(84) 98888-0000",
+    "endereco": "Rua das Gaivotas, 55, Redinha, Natal/RN, CEP 59122-000",
+    "responsavel": "Sílvia Andrade"
+  },
+  "projeto": {
+    "nome": "PDV Estrela do Mar",
+    "objeto": "Desenvolvimento, implantação e licença de uso do sistema PDV Estrela do Mar, hospedado e mantido pela Argos Soluções.",
+    "escopo": ["Frente de caixa com pagamento misto e troco", "Abertura, sangria e fechamento de caixa", "Controle de estoque e estoque mínimo", "Contas a receber e despesas", "Relatórios de vendas e lucro", "Login com perfis e auditoria"],
+    "prazo": "24 horas de implementação e desenvolvimento, mais 2 h de treinamento",
+    "horas": 24,
+    "hospedagem": "Lovable Cloud, contratado pela Argos e coberto pela mensalidade",
+    "banco_de_dados": "Postgres na nuvem",
+    "dominio_email": "Domínio .com.br (3 anos) e e-mail profissional (4 anos) na Hostinger, pagos pela loja na entrada"
+  },
+  "itens": [
+    {"tipo": "implementacao", "descricao": "Implantação e desenvolvimento do sistema", "cobranca": "unico", "valor": 1351.8, "vencimento": null},
+    {"tipo": "mensalidade", "descricao": "Mensalidade (inclui manutenção e suporte)", "cobranca": "recorrente", "valor": 148, "periodicidade_meses": 1, "vencimento": null},
+    {"tipo": "suporte", "descricao": "Hora técnica (sob demanda)", "cobranca": "sob_demanda", "valor": 50}
+  ],
+  "condicoes": {
+    "emissao": "2026-10-18",
+    "validade_dias": 15,
+    "assinatura": null,
+    "inicio": null,
+    "fim": null,
+    "vigencia_meses": 12,
+    "dia_vencimento": 10,
+    "reajuste_indice": "IPCA",
+    "multa_percentual": 2,
+    "juros_mensais_percentual": 1,
+    "forma_pagamento": "Opção 1: entrada à vista (Pix) e mensalidades até o dia 10. Opção 2: primeiro ano no cartão em 10x, com a taxa da maquininha repassada.",
+    "custos_pagos_pelo_cliente": ["Registro de domínio e e-mail na Hostinger (valores incluídos na entrada)"],
+    "descontos": ["Desconto de 50% na implementação, mediante declaração de capacidade técnica"]
+  },
+  "setor_publico": null
+}
+
