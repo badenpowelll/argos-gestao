@@ -1,0 +1,148 @@
+/* Argos Design System 2.0 — tokens em 3 camadas.
+   1) Primitivos: valores brutos (cores oficiais de marca NÃO podem ser alteradas).
+   2) Semânticos: papel da cor/medida no tema (claro/escuro).
+   3) De componente: ajustes por componente, referenciando os semânticos.
+   Tokens funcionais (estado, tema escuro, borda de controle) são propostas técnicas ainda não homologadas pela marca. */
+
+:root {
+  /* ===== 1. Primitivos ===== */
+  --argos-navy: #000f37;
+  --argos-orange: #ff5d00;
+  --argos-white: #ffffff;
+  --argos-gray: #d1d2d2;
+  --argos-rust: #b02500;
+  --argos-tint-orange: #ffe7d6;
+  --argos-tint-navy: #dde2ec;
+
+  --ads-font-sans: 'Argos Sans', Inter, system-ui, -apple-system, 'Segoe UI', Arial, sans-serif; /* Inter provisório */
+  --ads-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ads-text-xs: 0.75rem;
+  --ads-text-sm: 0.875rem;
+  --ads-text-md: 1rem;
+  --ads-text-lg: 1.125rem;
+  --ads-text-xl: 1.25rem;
+  --ads-text-2xl: 1.5rem;
+  --ads-text-4xl: 2.25rem;
+  --ads-lh-title: 1;
+  --ads-lh-subtitle: 1.15;
+  --ads-lh-body: 1.4;
+
+  --ads-space-1: 4px;
+  --ads-space-2: 8px;
+  --ads-space-3: 12px;
+  --ads-space-4: 16px;
+  --ads-space-5: 20px;
+  --ads-space-6: 24px;
+  --ads-space-8: 32px;
+  --ads-radius-sm: 6px;
+  --ads-radius-md: 10px;
+  --ads-radius-lg: 16px;
+  --ads-radius-full: 999px;
+  --ads-bp-sm: 640px;
+  --ads-bp-md: 768px;
+  --ads-bp-lg: 1024px;
+  --ads-bp-xl: 1440px;
+  --ads-control-height: 44px; /* alvo de toque */
+  --ads-z-dropdown: 40;
+  --ads-z-overlay: 50;
+  --ads-z-toast: 60;
+
+  /* ===== 2. Semânticos — tema claro ===== */
+  color-scheme: light;
+  --ads-color-background: #f5f7fa;
+  --ads-color-surface: #ffffff;
+  --ads-color-surface-muted: #eef1f6;
+  --ads-color-foreground: var(--argos-navy);
+  --ads-color-foreground-muted: #48566f;
+  --ads-color-border: var(--argos-gray); /* divisórias (decorativo) */
+  --ads-color-border-control: #7a8499; /* bordas de controles, >= 3:1 */
+  --ads-color-focus: #245dcc;
+  --ads-color-primary: var(--argos-orange);
+  --ads-color-on-primary: var(--argos-navy); /* branco sobre laranja = 3,1:1, não usar em texto normal */
+  --ads-color-secondary: var(--argos-navy);
+  --ads-color-on-secondary: #ffffff;
+  --ads-color-overlay: rgba(0, 15, 55, 0.6);
+  --ads-color-link: #245dcc;
+
+  --ads-color-success-bg: #dcfce7;
+  --ads-color-success-fg: #14532d;
+  --ads-color-success-accent: #166534;
+  --ads-color-warning-bg: #fff0c2;
+  --ads-color-warning-fg: #713f12;
+  --ads-color-warning-accent: #9a6700;
+  --ads-color-danger-bg: #fee2e2;
+  --ads-color-danger-fg: #991b1b;
+  --ads-color-danger-accent: var(--argos-rust);
+  --ads-color-danger-text: var(--argos-rust);
+  --ads-color-info-bg: var(--argos-tint-navy);
+  --ads-color-info-fg: var(--argos-navy);
+  --ads-color-info-accent: #245dcc;
+  --ads-color-neutral-bg: #e5e7eb;
+  --ads-color-neutral-fg: #1f2937;
+  --ads-color-neutral-accent: #4b5563;
+
+  --ads-shadow-card: 0 8px 28px rgba(0, 15, 55, 0.06);
+  --ads-shadow-overlay: 0 24px 64px rgba(0, 15, 55, 0.25);
+
+  /* ===== 3. De componente ===== */
+  --ads-button-height: var(--ads-control-height);
+  --ads-button-radius: var(--ads-radius-md);
+  --ads-button-primary-bg: var(--ads-color-primary);
+  --ads-button-primary-fg: var(--ads-color-on-primary);
+  --ads-button-secondary-bg: var(--ads-color-secondary);
+  --ads-button-secondary-fg: var(--ads-color-on-secondary);
+  --ads-button-danger-bg: var(--argos-rust);
+  --ads-button-danger-fg: #ffffff;
+  --ads-input-height: var(--ads-control-height);
+  --ads-input-radius: var(--ads-radius-md);
+  --ads-input-bg: var(--ads-color-surface);
+  --ads-input-border: var(--ads-color-border-control);
+  --ads-card-radius: var(--ads-radius-lg);
+  --ads-card-bg: var(--ads-color-surface);
+  --ads-card-shadow: var(--ads-shadow-card);
+  --ads-dialog-radius: var(--ads-radius-lg);
+  --ads-dialog-bg: var(--ads-color-surface);
+  --ads-table-stripe: var(--ads-color-surface-muted);
+  --ads-badge-radius: var(--ads-radius-full);
+  --ads-toast-bg: var(--ads-color-surface);
+  --ads-sidebar-bg: var(--argos-navy);
+  --ads-sidebar-fg: #ffffff;
+}
+
+/* ===== Tema escuro (semânticos redefinidos) ===== */
+[data-theme='dark'] {
+  color-scheme: dark;
+  --ads-color-background: #07132b;
+  --ads-color-surface: #101f3b;
+  --ads-color-surface-muted: #172a4d;
+  --ads-color-foreground: #f8fafc;
+  --ads-color-foreground-muted: #cbd5e1;
+  --ads-color-border: #40506a;
+  --ads-color-border-control: #7f8fad;
+  --ads-color-focus: #ffb88e;
+  --ads-color-secondary: var(--argos-tint-navy);
+  --ads-color-on-secondary: var(--argos-navy);
+  --ads-color-overlay: rgba(0, 0, 0, 0.65);
+  --ads-color-link: #8db4ff;
+
+  --ads-color-success-bg: #12361f;
+  --ads-color-success-fg: #86efac;
+  --ads-color-success-accent: #4ade80;
+  --ads-color-warning-bg: #3d2f05;
+  --ads-color-warning-fg: #fde68a;
+  --ads-color-warning-accent: #fbbf24;
+  --ads-color-danger-bg: #4a1a10;
+  --ads-color-danger-fg: #ffb4a0;
+  --ads-color-danger-accent: #ff8b6b;
+  --ads-color-danger-text: #ffb4a0;
+  --ads-color-info-bg: #1c2f55;
+  --ads-color-info-fg: var(--argos-tint-navy);
+  --ads-color-info-accent: #8db4ff;
+  --ads-color-neutral-bg: #26344f;
+  --ads-color-neutral-fg: #e2e8f0;
+  --ads-color-neutral-accent: #94a3b8;
+
+  --ads-shadow-card: 0 8px 28px rgba(0, 0, 0, 0.18);
+  --ads-shadow-overlay: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --ads-table-stripe: var(--ads-color-surface-muted);
+}

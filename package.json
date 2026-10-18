@@ -1,0 +1,25 @@
+{
+  "name": "argos-gestao",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ARGOS GESTÃO 360° — ERP/CRM de clientes, contratos e cobranças da Argos Soluções",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "npm run migrate -w server && npm run start -w server",
+    "migrate": "npm run migrate -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "test": "npm run test -w server && npm run test -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
