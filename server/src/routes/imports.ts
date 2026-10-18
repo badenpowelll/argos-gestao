@@ -67,7 +67,7 @@ export function importRoutes(db: Db) {
         client: clientSchema.nullish(),
         system: systemSchema.omit({client_id: true}).nullish(),
         contract: contractSchema.innerType().omit({client_id: true, system_id: true, source_document_id: true}).extend({
-          client_id: uuid.optional(), system_id: uuid.optional()
+          client_id: uuid.nullish(), system_id: uuid.nullish() // a tela envia null quando não há sistema
         }),
         items: z.array(itemSchema).min(1, 'Informe ao menos um item')
       }),

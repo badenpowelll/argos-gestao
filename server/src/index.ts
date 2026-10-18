@@ -4,8 +4,10 @@ import {createPool, migrate, withTx} from './db.js';
 import {generateCharges} from './services/billing.js';
 
 const cfg = loadConfig();
-const db = createPool(cfg.databaseUrl, cfg.dbSsl);
-const applied = await migrate(db);
+// DB_SCHEMA (opcional) isola um ambiente de desenvolvimento/pré-visualização dentro do mesmo Postgres.
+const schema = process.env.DB_SCHEMA || undefined;
+const db = createPool(cfg.databaseUrl, cfg.dbSsl, schema);
+const applied = await migrate(db, schema);
 if (applied.length) console.log(`[db] migrações aplicadas: ${applied.join(', ')}`);
 
 const app = createApp(db, cfg);

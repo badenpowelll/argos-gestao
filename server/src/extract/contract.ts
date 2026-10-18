@@ -66,6 +66,10 @@ const KEYWORDS: {kind: string; re: RegExp}[] = [
   {kind: 'outro', re: /\bentrada\b/i}
 ];
 
+const KIND_TEXT: Record<string, string> = {
+  implementacao: 'Implementação', desenvolvimento: 'Desenvolvimento', licenca: 'Licença', hospedagem: 'Hospedagem', dominio: 'Domínio',
+  treinamento: 'Treinamento', suporte: 'Suporte e manutenção', mensalidade: 'Mensalidade', outro: 'Entrada'
+};
 const clip = (s: string, n = 260) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
 
@@ -213,7 +217,7 @@ export function extractContract(text: string, pages: string[] = [text]): Extract
       const qtyM = s.match(/(\d{1,4})\s*(?:\(\w[^)]*\)\s*)?usu[aá]rios?/i);
       found.push({
         kind: kw.kind,
-        description: kw.kind === 'outro' ? 'Entrada' : kw.kind[0]?.toUpperCase() + kw.kind.slice(1),
+        description: KIND_TEXT[kw.kind] ?? 'Item',
         billing_type: b.billing_type,
         amount_cents: cents,
         quantity: b.billing_type === 'por_usuario' && qtyM ? Number(qtyM[1]) : 1,

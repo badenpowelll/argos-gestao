@@ -1,0 +1,13 @@
+{
+  "name": "Argos Gestão 360°",
+  "short_name": "Argos Gestão",
+  "description": "Clientes, contratos e cobranças da Argos Soluções",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#000F37",
+  "icons": [
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

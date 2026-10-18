@@ -74,7 +74,10 @@ describe('importar contrato → confirmar → cadastrar', () => {
       reviewed: true,
       client: {kind: 'empresa_privada', name: 'PADARIA TESTE LTDA', document: fmt, whatsapp: '(84) 99999-1111'},
       system: {name: 'PDV Padaria', status: 'em_producao', operational_cost_cents: 2500},
-      contract: {kind: 'contrato', object: 'Licença de uso do PDV', signed_at: '2026-10-15', due_day: 10, fine_percent: 2, interest_monthly_percent: 1},
+      // mesmo formato enviado pela tela (campos vazios chegam como null)
+      contract: {kind: 'contrato', object: 'Licença de uso do PDV', signed_at: '2026-10-15', start_date: null, end_date: null, auto_renew: false, adjustment_index: null,
+        adjustment_month: null, payment_terms: null, due_day: 10, fine_percent: 2, interest_monthly_percent: 1, is_public_flow: false, administrative_process: null,
+        commitment_number: null, notes: null, system_id: null},
       items: [
         {kind: 'implementacao', description: 'Entrada / implantação', billing_type: 'unico', unit_amount_cents: 149980, first_due_date: firstDue},
         {kind: 'mensalidade', description: 'Mensalidade PDV', billing_type: 'recorrente', unit_amount_cents: 14800, first_due_date: firstDue}
