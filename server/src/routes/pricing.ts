@@ -1,5 +1,7 @@
 import {Router} from 'express';
+import rateLimit from 'express-rate-limit';
 import {z} from 'zod';
+import {analyzeSite, UnsafeUrlError} from '../analyze/site.js';
 import {audit} from '../audit.js';
 import {ADMIN, FINANCE, actorOf, requireRole} from '../auth.js';
 import type {Db} from '../db.js';
@@ -181,6 +183,21 @@ export function pricingRoutes(db: Db, fetchFn: typeof fetch = fetch) {
     const tax = await currentTax(db, today());
     const computed = computeProposal(content, {catalog, fx, tax, settings});
     res.json(computed);
+  }));
+
+  // ---- análise automática de um sistema pelo link (sugestões para escopo/infraestrutura; revisão humana obrigatória)
+  const analyzeLimiter = rateLimit({windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false});
+  r.post('/analyze-url', requireRole('admin', 'financeiro', 'operador'), analyzeLimiter, asyncHandler(async (req, res) => {
+    const b = parse(z.object({url: z.string().trim().min(8).max(500)}), req.body);
+    let analysis;
+    try {
+      analysis = await analyzeSite(b.url);
+    } catch (e) {
+      if (e instanceof UnsafeUrlError) throw new HttpError(422, e.message, 'unsafe_url');
+      throw new HttpError(502, `Não foi possível acessar o endereço: ${(e as Error).message}. Preencha manualmente.`, 'fetch_failed');
+    }
+    await audit(db, actorOf(req), 'proposal.analyze_url', 'pricing', null, {url: analysis.final_url, status: analysis.status});
+    res.json(analysis);
   }));
 
   // ---- QR Pix: valida o payload antes de usar

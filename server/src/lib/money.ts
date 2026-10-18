@@ -7,7 +7,7 @@ export function parseBRL(text: string): number | null {
 }
 
 export function formatBRL(cents: number): string {
-  return (cents / 100).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+  return (cents / 100).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'}).replace(/ /g, ' '); // espaço normal (WhatsApp/PDF)
 }
 
 /** Divide `total` em n parcelas; a diferença de arredondamento vai para a última. */

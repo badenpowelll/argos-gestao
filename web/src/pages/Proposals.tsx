@@ -7,6 +7,8 @@ import {brl, dateBR, dateTimeBR, formatDocument} from '../format';
 import {ConfirmDialog, ErrorNote, Loading, Money, MoneyInput, PageHeader, Status, useLoad} from '../ui';
 import {CatalogRefsEditor, LinesEditor, ListEditor, MethodEditor, PaymentEditor, SimulationPanel, cleanList} from '../pricing/editors';
 import type {CatalogItem, Computed, Content} from '../pricing/types';
+import {SiteAnalyzer} from '../pricing/SiteAnalyzer';
+import {SendCard} from '../pricing/SendCard';
 
 interface Row {id: string; number: string; project_name: string; client_name: string; display_status: string; one_time_cents: number; monthly_cents: number; issued_at: string | null; valid_until: string | null; current_version: number; contract_id: string | null}
 
@@ -177,12 +179,16 @@ export function ProposalEditorPage() {
               <Input label="Endereço completo" disabled={!canEdit || !!clientId} value={cd.address} onChange={(e) => { setCd({...cd, address: e.target.value}); setDirty(true); }} hint={clientId ? 'Vem do cadastro do cliente' : undefined} />
               <Input label="Nome do sistema/projeto" disabled={!canEdit} value={c.identification.project_name} onChange={(e) => upd((x) => ({...x, identification: {...x.identification, project_name: e.target.value}}))} />
               <Input label="Responsável comercial" disabled={!canEdit} value={c.identification.commercial_owner ?? ''} onChange={(e) => upd((x) => ({...x, identification: {...x.identification, commercial_owner: e.target.value}}))} />
+              <div className="span-2"><Input label="Link do sistema de teste (entregue ao cliente)" type="url" disabled={!canEdit} value={c.identification.test_url ?? ''} onChange={(e) => upd((x) => ({...x, identification: {...x.identification, test_url: e.target.value || null}}))} hint="Use a aba Escopo para analisar o link e sugerir módulos e infraestrutura automaticamente." /></div>
               <Input label="Validade (dias)" type="number" min={1} disabled={!canEdit} value={String(c.identification.validity_days)} onChange={(e) => upd((x) => ({...x, identification: {...x.identification, validity_days: Number(e.target.value)}}))} hint="Padrão 15 dias, contados da emissão" />
               <Input label="Data de emissão" disabled value={p.issued_at ? dateBR(p.issued_at) : 'preenchida na emissão'} onChange={() => undefined} />
             </div>
           </Card>)}
 
-          {tab === 'escopo' && (<Card title="Objeto e escopo">
+          {tab === 'escopo' && (<><SiteAnalyzer url={c.identification.test_url ?? ''} disabled={!canEdit} onUrl={(u) => upd((x) => ({...x, identification: {...x.identification, test_url: u || null}}))}
+            onApplyScope={(summary, groups) => upd((x) => ({...x, scope: {summary: x.scope.summary.trim() ? x.scope.summary : summary, groups: [...x.scope.groups.filter((g) => g.items.some((i) => i.trim())), ...groups]}}))}
+            onApplySchedule={(s) => upd((x) => ({...x, schedule: {...x.schedule, hosting: x.schedule.hosting || s.hosting, database: x.schedule.database || s.database, domain: x.schedule.domain || s.domain}}))} />
+          <Card title="Objeto e escopo">
             <Textarea label="Objeto (descrição dos serviços)" rows={4} disabled={!canEdit} value={c.scope.summary} onChange={(e) => upd((x) => ({...x, scope: {...x.scope, summary: e.target.value}}))} />
             <p className="muted" style={{fontSize: '.85rem'}}>Módulos e funcionalidades. A IA para sugerir descrições ainda não está ativa: escreva ou use modelos.</p>
             {c.scope.groups.map((g, i) => (
@@ -195,7 +201,7 @@ export function ProposalEditorPage() {
               <Button variant="outline" onClick={() => upd((x) => ({...x, scope: {...x.scope, groups: [...x.scope.groups, {title: '', items: []}]}}))}>+ Grupo</Button>
               <TemplateButtons kind="escopo" current={() => ({summary: c.scope.summary, groups: c.scope.groups.map((g) => ({...g, items: cleanList(g.items)}))})} onLoad={(b) => upd((x) => ({...x, scope: {summary: (b as Content['scope']).summary ?? '', groups: (b as Content['scope']).groups ?? []}}))} />
             </div>}
-          </Card>)}
+          </Card></>)}
 
           {tab === 'prazo' && (<Card title="Prazo e infraestrutura">
             <div className="form-grid">
@@ -276,6 +282,7 @@ export function ProposalEditorPage() {
                   <Checkbox key={k} label={l} checked={c.visibility[k]} disabled={!canEdit} onChange={(e) => upd((x) => ({...x, visibility: {...x.visibility, [k]: e.target.checked}}))} />))}
               </div>)}
             </Card>
+            {readOnly ? <SendCard id={id} version={data.version.version} number={p.number} onSent={reload} /> : <Alert tone="info" title="Envio ao cliente">Depois de emitir a proposta, esta aba permite enviar o PDF ao cliente pelo WhatsApp.</Alert>}
             <Card title="Pré-visualização do PDF">
               <div className="dialog-actions" style={{justifyContent: 'flex-start'}}>
                 {canEdit && <Button loading={saving} onClick={() => void save()}>Salvar e atualizar PDF</Button>}

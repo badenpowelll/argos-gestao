@@ -26,7 +26,7 @@ export type PaymentOption =
   | {id: string; type: 'personalizada'; label?: string; description: string; amount_cents?: number | null};
 
 export interface Content {
-  identification: {project_name: string; commercial_owner?: string | null; validity_days: number};
+  identification: {project_name: string; commercial_owner?: string | null; validity_days: number; test_url?: string | null};
   scope: {summary: string; groups: {title: string; items: string[]}[]};
   schedule: {dev_hours_text?: string | null; deadline?: string | null; training?: string | null; hosting?: string | null; domain?: string | null; email?: string | null; database?: string | null; responsibilities?: string | null};
   calc: {

@@ -49,7 +49,9 @@ export const proposalContentSchema = z.object({
   identification: z.object({
     project_name: z.string().trim().min(2).max(200),
     commercial_owner: z.string().trim().max(150).nullish(),
-    validity_days: z.number().int().min(1).max(365)
+    validity_days: z.number().int().min(1).max(365),
+    /** link do sistema de teste entregue ao cliente (usado para sugerir escopo e infraestrutura) */
+    test_url: z.string().trim().max(500).refine((v) => /^https?:\/\/\S+$/i.test(v), 'Use um link http(s)').nullish().or(z.literal('').transform(() => null))
   }),
   scope: z.object({
     summary: z.string().max(3000).default(''),

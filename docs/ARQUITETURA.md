@@ -1,4 +1,4 @@
-# ARGOS GESTÃO 360° — arquitetura e estado do projeto
+﻿# ARGOS GESTÃO 360° — arquitetura e estado do projeto
 
 > Documento para quem for revisar/consultar o projeto (engenharia, finanças, contabilidade). Atualizado em 18/10/2026.
 > Regra do projeto: **nada é declarado pronto sem estar implementado e validado**. Esta página separa o que está validado do que está pendente.
@@ -35,7 +35,7 @@ brand/       logomarca, favicon e brandbooks oficiais
 - **Proposta ≠ contrato:** propostas nunca geram cobrança; contrato só gera após **ativação confirmada** (data de assinatura obrigatória).
 - **Importação com revisão humana:** o PDF/DOCX é lido, cada campo mostra origem, página e confiança; **nada é gravado antes da confirmação**. Campo ausente fica ausente (nunca presumido). Original preservado (hash SHA-256, armazenamento privado em `bytea`).
 - **Versão de proposta emitida é congelada** (trigger): custos, câmbio e tributação posteriores não alteram propostas já emitidas.
-- Testes: `npm test` (88 testes; usam um *schema* descartável no Postgres, nunca os dados reais).
+- Testes: `npm test` (103 testes; usam um *schema* descartável no Postgres, nunca os dados reais).
 
 ## 3. Módulo Argos Pricing — regras de cálculo
 
@@ -63,7 +63,8 @@ brand/       logomarca, favicon e brandbooks oficiais
 | Cobranças, recorrência, PDV, estorno, juros/multa/desconto | ✅ testado |
 | Dashboard, relatórios CSV e PDF | ✅ |
 | Argos Pricing: motor, catálogo, câmbio, tributos, propostas versionadas, PDF, Pix, aprovação→contrato | ✅ testado (API) e telas criadas |
-| WhatsApp | ⚠️ **manual** (mensagem pronta + link + registro). API Business **não** integrada (falta conta/credenciais Meta) |
+| WhatsApp | ⚠️ **manual**: cobrança e **envio da proposta** (link seguro e revogável do PDF + mensagem pronta + wa.me + compartilhar arquivo no celular + registro do envio). API Business **não** integrada (falta conta/credenciais Meta) |
+| Análise de link do sistema (escopo/infra) | ✅ sugere telas, módulos e hospedagem a partir do link (com proteção SSRF); banco de dados, horas e prazo ficam **manuais**; telas atrás de login não são visíveis |
 | IA (Assistente Argos, sugestão de escopo) | ❌ não implementado |
 | Projetos/Kanban, Suporte, automações avançadas, conciliação bancária | ❌ não implementado (roadmap) |
 | Boleto/Pix automático (provedor de pagamento) | ❌ não implementado |
@@ -90,7 +91,8 @@ npm install
 cp .env.example .env      # preencher DATABASE_URL e SESSION_SECRET
 npm run migrate           # aplica as migrações
 npm run dev               # API :3000 + front :5173
-npm test                  # 88 testes (precisa de DATABASE_URL)
+npm test                  # 103 testes (precisa de DATABASE_URL)
 npm run build && npm start
 ```
 Produção: Railway (`railway up`), variáveis `DATABASE_URL` (referência ao Postgres), `SESSION_SECRET`, `NODE_ENV=production`, `DB_SSL=false`, `SETUP_CODE`.
+

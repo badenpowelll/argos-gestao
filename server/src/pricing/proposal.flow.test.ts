@@ -243,6 +243,68 @@ describe('visibilidade controlada e QR do Google', () => {
   });
 });
 
+describe('envio ao cliente por WhatsApp', () => {
+  let pid = '';
+  let clientId = '';
+  let url = '';
+  it('só proposta emitida pode ser compartilhada (rascunho é recusado)', async () => {
+    clientId = (await post(admin, '/api/clients', {kind: 'empresa_privada', name: 'Cliente WhatsApp', whatsapp: '(84) 99999-1111', responsible_name: 'Maria'})).body.id;
+    pid = (await post(admin, '/api/proposals', {client_id: clientId, project_name: 'PDV Envio'})).body.id;
+    await put(admin, `/api/proposals/${pid}/draft`, {content: atecContent()});
+    expect((await post(admin, `/api/proposals/${pid}/share`, {confirm: true})).status).toBe(409);
+    expect((await admin.get(`/api/proposals/${pid}/whatsapp`)).status).toBe(409);
+    expect((await post(admin, `/api/proposals/${pid}/issue`, {confirm: true})).status).toBe(200);
+  });
+  it('gera link secreto: serve o PDF sem login, conta visualizações, guarda só o hash e pode ser revogado', async () => {
+    expect((await post(admin, `/api/proposals/${pid}/share`, {})).status).toBe(422); // exige confirmação
+    const s = await post(admin, `/api/proposals/${pid}/share`, {confirm: true});
+    expect(s.status).toBe(201);
+    url = s.body.url;
+    expect(url).toMatch(/\/p\/[A-Za-z0-9_-]{40,}$/);
+    const token = url.split('/p/')[1] as string;
+    const pub = await request(env.app).get(`/p/${token}`).buffer(true).parse(binary); // sem cookie de sessão
+    expect(pub.status).toBe(200);
+    expect(pub.headers['content-type']).toBe('application/pdf');
+    expect(pub.headers['x-robots-tag']).toContain('noindex');
+    expect((pub.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+    expect((await env.db.query('select count(*)::int as n from proposal_shares where token_hash = $1', [token])).rows[0].n).toBe(0); // token em claro não é guardado
+    expect((await admin.get(`/api/proposals/${pid}/shares`)).body[0].views).toBe(1);
+    expect((await request(env.app).get('/p/token-que-nao-existe-123456789')).status).toBe(404);
+    const shareId = (await admin.get(`/api/proposals/${pid}/shares`)).body[0].id;
+    expect((await post(admin, `/api/proposals/${pid}/shares/${shareId}/revoke`)).status).toBe(200);
+    expect((await request(env.app).get(`/p/${token}`)).status).toBe(404); // revogado
+  });
+  it('link expirado deixa de funcionar', async () => {
+    const s = await post(admin, `/api/proposals/${pid}/share`, {confirm: true});
+    url = s.body.url;
+    await env.db.query("update proposal_shares set expires_at = now() - interval '1 minute' where revoked_at is null");
+    expect((await request(env.app).get(`/p/${url.split('/p/')[1]}`)).status).toBe(404);
+  });
+  it('monta a mensagem para o WhatsApp com número do cliente, valores, validade, link e contato da Argos', async () => {
+    const s = await post(admin, `/api/proposals/${pid}/share`, {confirm: true});
+    url = s.body.url;
+    const w = (await admin.get(`/api/proposals/${pid}/whatsapp?share_url=${encodeURIComponent(url)}`)).body;
+    expect(w.phone).toBe('5584999991111'); // do cadastro do cliente
+    expect(w.message).toContain('Olá');
+    expect(w.message).toContain('Investimento inicial: R$ 1.351,80');
+    expect(w.message).toContain('Mensalidade: R$ 148,00');
+    expect(w.message).toContain('Validade: até');
+    expect(w.message).toContain(url);
+    expect(w.message).toContain('(84) 99859-0183');
+    expect(w.link).toMatch(/^https:\/\/wa\.me\/5584999991111\?text=/);
+    const other = (await admin.get(`/api/proposals/${pid}/whatsapp?phone=${encodeURIComponent('(84) 98888-7777')}`)).body;
+    expect(other.phone).toBe('5584988887777'); // número digitado prevalece
+    expect((await admin.get(`/api/proposals/${pid}/whatsapp?share_url=${encodeURIComponent('https://evil.example/qualquer')}`)).status).toBe(422);
+  });
+  it('registrar o envio marca a proposta como enviada e grava no histórico de contatos do cliente', async () => {
+    expect((await post(admin, `/api/proposals/${pid}/sent`, {message: 'Proposta enviada'})).status).toBe(422);
+    const r = await post(admin, `/api/proposals/${pid}/sent`, {message: 'Proposta enviada por WhatsApp', confirm: true});
+    expect(r.body.status).toBe('enviada');
+    expect((await admin.get(`/api/clients/${clientId}`)).body.contacts.some((c: {channel: string; message: string}) => c.channel === 'whatsapp' && /Proposta enviada/.test(c.message))).toBe(true);
+    expect((await admin.get(`/api/proposals/${pid}`)).body.proposal.status).toBe('enviada');
+  });
+});
+
 describe('aprovação → contrato → cobranças no PDV', () => {
   let pid = '';
   it('aprova uma proposta emitida: preserva a versão, cria cliente, sistema e contrato em rascunho (sem cobranças)', async () => {

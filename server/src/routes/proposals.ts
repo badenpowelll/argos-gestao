@@ -1,11 +1,14 @@
+import crypto from 'node:crypto';
 import {Router} from 'express';
+import rateLimit from 'express-rate-limit';
 import {z} from 'zod';
 import {audit, type Actor} from '../audit.js';
 import {FINANCE, WRITERS, actorOf, requireRole} from '../auth.js';
 import {withTx, type Db, type Tx} from '../db.js';
 import {HttpError, asyncHandler, parse} from '../http.js';
 import {addMonths, today} from '../lib/dates.js';
-import {isValidDocument, onlyDigits} from '../lib/documents.js';
+import {isValidDocument, onlyDigits, toWhatsappNumber} from '../lib/documents.js';
+import {formatBRL} from '../lib/money.js';
 import {isoDateSchema, uuid} from '../lib/sql.js';
 import {computeProposal, type ComputedProposal} from '../pricing/compute.js';
 import {defaultContent, proposalContentSchema, type ProposalContent} from '../pricing/content.js';
@@ -57,7 +60,7 @@ function pixFor(content: ProposalContent, company: Record<string, any>, computed
   }
 }
 
-export function proposalRoutes(db: Db) {
+export function proposalRoutes(db: Db, appOrigin: string | null = null) {
   const r = Router();
 
   r.get('/', asyncHandler(async (_req, res) => {
@@ -316,6 +319,118 @@ export function proposalRoutes(db: Db) {
     res.status(201).json(out);
   }));
 
+  // ---- envio ao cliente (WhatsApp): link seguro do PDF + mensagem pronta + registro do envio
+  const loadIssued = async (id: string, versionQ: unknown) => {
+    const p = (await db.query('select p.*, p.valid_until::text as valid_until from proposals p where id = $1', [id])).rows[0];
+    if (!p) throw new HttpError(404, 'Proposta não encontrada');
+    const version = versionQ ? Number(versionQ) : p.current_version;
+    const v = (await db.query('select * from proposal_versions where proposal_id = $1 and version = $2', [id, version])).rows[0];
+    if (!v) throw new HttpError(404, 'Versão não encontrada');
+    if (v.status !== 'emitida') throw new HttpError(409, 'Emita a proposta antes de enviá-la ao cliente', 'not_issued');
+    return {p, v};
+  };
+
+  r.get('/:id/shares', asyncHandler(async (req, res) => {
+    const id = parse(uuid, req.params.id);
+    const {rows} = await db.query('select id, version, expires_at, revoked_at, views, last_viewed_at, created_at from proposal_shares where proposal_id = $1 order by created_at desc', [id]);
+    res.json(rows);
+  }));
+
+  r.post('/:id/share', requireRole(...WRITERS), asyncHandler(async (req, res) => {
+    const id = parse(uuid, req.params.id);
+    const b = parse(z.object({version: z.number().int().optional(), confirm: z.literal(true, {errorMap: () => ({message: 'Confirmação explícita obrigatória'})})}), req.body);
+    const {p, v} = await loadIssued(id, b.version);
+    if (p.status === 'cancelada' || p.status === 'recusada') throw new HttpError(409, 'Proposta cancelada/recusada não pode ser compartilhada');
+    const token = crypto.randomBytes(32).toString('base64url');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const until = p.valid_until ? `${p.valid_until}T23:59:59-03:00` : new Date(Date.now() + 15 * 86_400_000).toISOString();
+    const expires = new Date(Math.max(Date.parse(until), Date.now() + 24 * 3600_000)); // no mínimo 24 h
+    await db.query('insert into proposal_shares (proposal_id, version, token_hash, expires_at, created_by) values ($1,$2,$3,$4,$5)', [id, v.version, hash, expires.toISOString(), actorOf(req).id]);
+    await audit(db, actorOf(req), 'proposal.share', 'proposal', id, {version: v.version, expires_at: expires.toISOString()});
+    const origin = appOrigin ?? `${req.protocol}://${req.get('host')}`;
+    res.status(201).json({url: `${origin}/p/${token}`, expires_at: expires.toISOString(), version: v.version});
+  }));
+
+  r.post('/:id/shares/:shareId/revoke', requireRole(...WRITERS), asyncHandler(async (req, res) => {
+    const id = parse(uuid, req.params.id);
+    const {rowCount} = await db.query('update proposal_shares set revoked_at = now() where id = $1 and proposal_id = $2 and revoked_at is null', [parse(uuid, req.params.shareId), id]);
+    if (!rowCount) throw new HttpError(404, 'Link não encontrado ou já revogado');
+    await audit(db, actorOf(req), 'proposal.share_revoke', 'proposal', id, {share: req.params.shareId});
+    res.json({ok: true});
+  }));
+
+  r.get('/:id/whatsapp', asyncHandler(async (req, res) => {
+    const id = parse(uuid, req.params.id);
+    const {p, v} = await loadIssued(id, req.query.version);
+    const shareUrl = typeof req.query.share_url === 'string' ? req.query.share_url : null;
+    if (shareUrl && !/^https?:\/\/[^\s]+\/p\/[A-Za-z0-9_-]{20,}$/.test(shareUrl)) throw new HttpError(422, 'Link de compartilhamento inválido');
+    const computed = v.result as ComputedProposal;
+    const company = await loadCompany(db);
+    const cl = p.client_id ? (await db.query('select name, whatsapp, phone, responsible_name from clients where id = $1', [p.client_id])).rows[0] : null;
+    const snap = p.client_snapshot as ClientSnap;
+    const number = toWhatsappNumber(typeof req.query.phone === 'string' && req.query.phone ? req.query.phone : (cl?.whatsapp ?? cl?.phone ?? snap.whatsapp ?? snap.phone));
+    const one = computed.totals.one_time_final_cents;
+    const mo = computed.totals.monthly_final_cents;
+    const valid = p.valid_until ? p.valid_until.split('-').reverse().join('/') : null;
+    const lines = [
+      `Olá${cl?.responsible_name ? `, ${cl.responsible_name}` : ''}!`,
+      `Segue a proposta comercial ${p.number} — ${v.content.identification.project_name}.`,
+      [one > 0 ? `Investimento inicial: ${formatBRL(one)}` : null, mo > 0 ? `Mensalidade: ${formatBRL(mo)}` : null].filter(Boolean).join('\n') || null,
+      valid ? `Validade: até ${valid}.` : null,
+      shareUrl ? `Para ver a proposta completa em PDF:\n${shareUrl}` : null,
+      'Qualquer dúvida, estou à disposição.',
+      `${company.trade_name}${company.whatsapp ? ` — ${formatContact(company.whatsapp)}` : ''}`
+    ].filter(Boolean);
+    const message = lines.join('\n\n');
+    res.json({message, phone: number, link: number ? `https://wa.me/${number}?text=${encodeURIComponent(message)}` : null, client_has_number: !!number});
+  }));
+
+  r.post('/:id/sent', requireRole(...WRITERS), asyncHandler(async (req, res) => {
+    const id = parse(uuid, req.params.id);
+    const b = parse(z.object({message: z.string().max(4000).nullish(), channel: z.enum(['whatsapp', 'email', 'outro']).default('whatsapp'), confirm: z.literal(true)}), req.body);
+    const {p, v} = await loadIssued(id, undefined);
+    const a = actorOf(req);
+    await withTx(db, async (tx) => {
+      if (p.client_id) await tx.query('insert into contact_log (client_id, channel, direction, message, operator_id, operator_name) values ($1,$2,\'saida\',$3,$4,$5)', [p.client_id, b.channel, b.message ?? `Proposta ${p.number} enviada`, a.id, a.name]);
+      if (p.status === 'emitida') await tx.query("update proposals set status = 'enviada', updated_at = now() where id = $1", [id]);
+      await audit(tx, a, 'proposal.sent', 'proposal', id, {channel: b.channel, version: v.version, manual: true});
+    });
+    res.json({ok: true, status: p.status === 'emitida' ? 'enviada' : p.status});
+  }));
+
   void addMonths;
   return r;
+}
+
+/** Download público do PDF por link secreto (sem login). Token aleatório de 256 bits; só o hash fica no banco. */
+export function publicProposalRoutes(db: Db) {
+  const r = Router();
+  const limiter = rateLimit({windowMs: 60_000, limit: 60, standardHeaders: true, legacyHeaders: false});
+  r.get('/:token', limiter, asyncHandler(async (req, res) => {
+    const token = String(req.params.token ?? '');
+    const notFound = () => new HttpError(404, 'Link inválido ou expirado');
+    if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) throw notFound();
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const s = (await db.query(
+      `select s.id, s.proposal_id, v.pdf_document_id, p.number, p.status from proposal_shares s
+         join proposal_versions v on v.proposal_id = s.proposal_id and v.version = s.version join proposals p on p.id = s.proposal_id
+        where s.token_hash = $1 and s.revoked_at is null and s.expires_at > now()`, [hash])).rows[0];
+    if (!s || !s.pdf_document_id || ['cancelada', 'recusada'].includes(s.status)) throw notFound();
+    const buf = (await db.query('select content from documents where id = $1', [s.pdf_document_id])).rows[0]?.content as Buffer | undefined;
+    if (!buf) throw notFound();
+    await db.query('update proposal_shares set views = views + 1, last_viewed_at = now() where id = $1', [s.id]);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="Proposta-${s.number}.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+    res.send(buf);
+  }));
+  return r;
+}
+
+function formatContact(n: string): string {
+  const d = n.replace(/^55/, '');
+  return d.length === 11 ? `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}` : n;
 }

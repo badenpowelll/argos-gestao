@@ -17,7 +17,7 @@ import {documentRoutes} from './routes/documents.js';
 import {importRoutes} from './routes/imports.js';
 import {auditRoutes, companyRoutes, expenseRoutes} from './routes/misc.js';
 import {pricingRoutes} from './routes/pricing.js';
-import {proposalRoutes} from './routes/proposals.js';
+import {proposalRoutes, publicProposalRoutes} from './routes/proposals.js';
 import {reportRoutes} from './routes/reports.js';
 import {systemRoutes} from './routes/systems.js';
 import {userRoutes} from './routes/users.js';
@@ -80,10 +80,11 @@ export function createApp(db: Db, cfg: Config) {
   app.use('/api/company', needsAuth, companyRoutes(db));
   app.use('/api/audit', needsAuth, auditRoutes(db));
   app.use('/api/pricing', needsAuth, pricingRoutes(db));
-  app.use('/api/proposals', needsAuth, proposalRoutes(db));
+  app.use('/api/proposals', needsAuth, proposalRoutes(db, cfg.appOrigin));
   app.use('/api/dashboard', needsAuth, dashboardRoutes(db));
   app.use('/api/reports', needsAuth, reportRoutes(db));
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Rota não encontrada')));
+  app.use('/p', publicProposalRoutes(db)); // link secreto do PDF enviado ao cliente (sem login)
 
   // Frontend estático (produção): web/dist copiado ou resolvido relativo ao servidor.
   const webDist = [path.resolve(here, '../../web/dist'), path.resolve(process.cwd(), 'web/dist')].find((p) => fs.existsSync(p));

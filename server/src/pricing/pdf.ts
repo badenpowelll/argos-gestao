@@ -196,6 +196,7 @@ export async function renderProposalPdf(d: ProposalDocData): Promise<Buffer> {
     ['CPF/CNPJ', cnpjFmt(d.client.document)],
     ['Endereço', d.client.address ?? '—'],
     ['Projeto', d.project_name],
+    ...(d.content.identification.test_url ? [['Link de teste', d.content.identification.test_url] as [string, string]] : []),
     ['Responsável comercial', d.commercial_owner ?? d.company.responsible_name ?? '—'],
     ['Data de emissão', d.draft ? 'a definir na emissão' : date(d.issued_at)],
     ['Validade', d.draft ? `${d.content.identification.validity_days} dias a contar da emissão` : `${d.content.identification.validity_days} dias (até ${date(d.valid_until)})`]
@@ -261,7 +262,7 @@ export async function renderProposalPdf(d: ProposalDocData): Promise<Buffer> {
   }
   const payRows = (p: PaymentResult) => p.rows.map((r) => ({label: r.label, amount: r.amount_cents, emphasis: r.emphasis}));
   d.computed.payments.forEach((p, i) => {
-    ensure(40);
+    ensure(24 + p.rows.reduce((s, r) => s + Math.max(heightOf(r.label, W - 132, 9, r.emphasis ? 'Helvetica-Bold' : 'Helvetica'), 11) + 8, 0)); // mantém a opção inteira na mesma página
     text(/^op[çc][aã]o\s*\d/i.test(p.title) ? p.title : `Opção ${i + 1}: ${p.title}`, L, y, {font: 'Helvetica-Bold', size: 9.5, width: W});
     y += 15;
     table(payRows(p));
@@ -270,7 +271,9 @@ export async function renderProposalPdf(d: ProposalDocData): Promise<Buffer> {
   // ---------- 5 custo de infraestrutura (somente com autorização)
   if (vis.infra_table) {
     section('Custo de infraestrutura');
-    const all = [...d.computed.catalog_resolved.recurring, ...d.computed.catalog_resolved.one_time].filter((x) => !x.excluded_reason);
+    const rec = d.computed.catalog_resolved.recurring;
+    // itens recorrentes (rateio mensal) + itens só da entrada (ex.: domínio), sem repetir o mesmo item
+    const all = [...rec, ...d.computed.catalog_resolved.one_time.filter((o) => !rec.some((r) => r.item_id === o.item_id))].filter((x) => !x.excluded_reason);
     if (all.length) {
       table(all.map((x) => ({
         label: `${x.name}${vis.tools_allocation ? ` (${x.currency !== 'BRL' && x.fx ? `${x.currency} ${((x.price_cents ?? 0) / 100).toFixed(2)} × ${x.fx.rate} · ` : ''}rateio ${String(x.allocation_pct).replace('.', ',')}%)` : ''}`,
@@ -312,17 +315,16 @@ export async function renderProposalPdf(d: ProposalDocData): Promise<Buffer> {
     ['Pix (CNPJ)', c.pix_key_cnpj ?? '—'],
     ['Pix (chave aleatória)', c.pix_key_random ?? '—']
   ];
-  const blockH = Math.max(qrs.length ? 128 : 0, kvRows.length * 16 + 10);
+  const leftW = W - qrW; // coluna esquerda: dados; direita: QR codes
+  const rowH = kvRows.map(([, v]) => Math.max(heightOf(v, leftW - 124), 11) + 6);
+  const blockH = Math.max(qrs.length ? 128 : 0, rowH.reduce((a, b) => a + b, 0) + 10);
   ensure(blockH + 6);
   const startY = y;
-  const savedW = W;
-  // coluna esquerda: dados; direita: QR codes
-  const leftW = savedW - qrW;
   kvRows.forEach(([k, v], i) => {
-    doc.rect(L, y - 2, leftW, 16).fill(i % 2 ? '#FFFFFF' : '#F5F7FA');
+    doc.rect(L, y - 2, leftW, rowH[i] as number).fill(i % 2 ? '#FFFFFF' : '#F5F7FA');
     text(k, L + 6, y + 1, {font: 'Helvetica-Bold', size: 8.5, color: MUTED, width: 110, lineBreak: false});
-    text(v, L + 120, y + 1, {size: 9, width: leftW - 124, lineBreak: false, ellipsis: true});
-    y += 16;
+    text(v, L + 120, y + 1, {size: 9, width: leftW - 124});
+    y += rowH[i] as number;
   });
   qrs.forEach((q, i) => {
     const x = L + leftW + 10 + i * 100 - (qrs.length > 1 ? 0 : 0);
