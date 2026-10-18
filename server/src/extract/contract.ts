@@ -192,12 +192,12 @@ export function extractContract(text: string, pages: string[] = [text]): Extract
   const found: ExtractedItem[] = [];
   const discounts: string[] = [];
   for (const s of sents) {
-    const amounts = [...s.matchAll(MONEY)];
-    if (!amounts.length) continue;
     if (/desconto/i.test(s)) {
-      discounts.push(s);
+      discounts.push(s); // pode ser percentual ou valor: sempre vai para revisão humana
       continue;
     }
+    const amounts = [...s.matchAll(MONEY)];
+    if (!amounts.length) continue;
     for (const kw of KEYWORDS) {
       const km = s.match(kw.re);
       if (!km) continue;

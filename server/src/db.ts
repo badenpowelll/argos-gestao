@@ -12,18 +12,14 @@ export type Db = pg.Pool;
 export type Tx = pg.PoolClient;
 
 export function createPool(url: string, ssl: boolean, schema?: string): Db {
+  if (schema && !/^[a-z_][a-z0-9_]*$/.test(schema)) throw new Error('schema inválido');
   const pool = new pg.Pool({
     connectionString: url,
     ssl: ssl ? {rejectUnauthorized: false} : undefined,
     max: 10,
-    idleTimeoutMillis: 30_000
+    idleTimeoutMillis: 30_000,
+    ...(schema ? {options: `-c search_path=${schema},public`} : {})
   });
-  if (schema) {
-    if (!/^[a-z_][a-z0-9_]*$/.test(schema)) throw new Error('schema inválido');
-    pool.on('connect', (client) => {
-      void client.query(`set search_path to ${schema}, public`);
-    });
-  }
   pool.on('error', (err) => console.error('[pg] erro no pool ocioso', err.message));
   return pool;
 }
