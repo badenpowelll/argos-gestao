@@ -1,0 +1,1 @@
+ALTER TABLE public.time_entries ADD COLUMN mood_score smallint DEFAULT NULL;

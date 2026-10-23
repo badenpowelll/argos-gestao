@@ -1,0 +1,1 @@
+ALTER TABLE public.solicitacoes_suporte ADD COLUMN IF NOT EXISTS protocolo_argos text;

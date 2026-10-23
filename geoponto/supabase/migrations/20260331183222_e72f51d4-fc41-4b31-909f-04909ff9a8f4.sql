@@ -1,0 +1,1 @@
+ALTER TABLE public.registration_requests ADD COLUMN password_temp TEXT DEFAULT NULL;
