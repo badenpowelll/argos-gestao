@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Calendar, Clock, Loader2, Search, MapPin, CalendarCheck } from "lucide-react";
 import { format, parseISO, isSunday, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { db } from "@/lib/untypedDb";
+import { downloadComprovante } from "@/utils/comprovantePdf";
 import { calculateDailyMinutes, formatMinutes, isEntryLate } from "@/utils/timeCalculations";
 
 interface TimeEntry {
@@ -20,6 +22,9 @@ interface TimeEntry {
   longitude: number | null;
   accuracy: number | null;
   mood_score: number | null;
+  nsr?: number | null;
+  record_hash?: string | null;
+  server_received_at?: string | null;
 }
 
 const MyPunches = () => {
@@ -34,6 +39,20 @@ const MyPunches = () => {
   const [absences, setAbsences] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  const downloadReceipt = async (entry: TimeEntry) => {
+    if (!user || entry.nsr == null || !entry.record_hash) return;
+    const { data: me } = await db.from("profiles").select("name, cpf, company_id").eq("user_id", user.id).maybeSingle();
+    const profile = me as { name?: string; cpf?: string | null; company_id?: string | null } | null;
+    const { data: company } = profile?.company_id
+      ? await supabase.from("companies").select("name, cnpj").eq("id", profile.company_id).maybeSingle()
+      : { data: null };
+    downloadComprovante({
+      nsr: entry.nsr, hash: entry.record_hash, timestamp: entry.timestamp, serverReceivedAt: entry.server_received_at ?? null, type: entry.type,
+      employeeName: profile?.name ?? "Trabalhador", employeeCpf: profile?.cpf ?? null,
+      employerName: company?.name ?? "Empregador", employerCnpj: company?.cnpj ?? "",
+    });
+  };
 
   const fetchEntries = async () => {
     if (!user || !startDate || !endDate) return;
@@ -248,6 +267,11 @@ const MyPunches = () => {
                                   <MapPin className="h-3 w-3" />
                                   GPS OK
                                 </span>
+                              )}
+                              {entry.nsr != null && (
+                                <button type="button" onClick={() => downloadReceipt(entry)} className="text-[10px] font-medium text-primary underline-offset-2 hover:underline">
+                                  Comprovante · NSR {entry.nsr}
+                                </button>
                               )}
                               <StatusBadge status={entry.status as any} />
                             </div>

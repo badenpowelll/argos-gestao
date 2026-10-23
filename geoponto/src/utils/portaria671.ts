@@ -104,3 +104,82 @@ export const buildComprovante = (p: ChainedPunch, employeeName: string, companyN
     `Tipo: ${p.type === "in" ? "Entrada" : "Saída"}`,
     `Código de integridade: ${p.hash}`,
   ].join("\n");
+
+export interface Anomaly {
+  user_id: string;
+  date: string;
+  nsr: number;
+  kind: "entrada_sem_saida" | "saida_sem_entrada" | "marcacao_duplicada";
+}
+
+export const ANOMALY_LABEL: Record<Anomaly["kind"], string> = {
+  entrada_sem_saida: "Entrada sem saída correspondente",
+  saida_sem_entrada: "Saída sem entrada anterior",
+  marcacao_duplicada: "Marcação repetida em menos de 1 minuto",
+};
+
+/**
+ * Procura marcações que exigem conferência do RH. Não altera nada: só aponta.
+ * Espera a cadeia já ordenada por NSR (cronológica).
+ */
+export const findAnomalies = (chain: ChainedPunch[]): Anomaly[] => {
+  const result: Anomaly[] = [];
+  const byUser = new Map<string, ChainedPunch[]>();
+  for (const p of chain) byUser.set(p.user_id, [...(byUser.get(p.user_id) ?? []), p]);
+
+  for (const [user_id, list] of byUser) {
+    let open: ChainedPunch | null = null;
+    let prev: ChainedPunch | null = null;
+    for (const p of list) {
+      const date = format(parseISO(p.timestamp), "yyyy-MM-dd");
+      if (prev && prev.type === p.type && Date.parse(p.timestamp) - Date.parse(prev.timestamp) < 60_000) {
+        result.push({ user_id, date, nsr: p.nsr, kind: "marcacao_duplicada" });
+      } else if (p.type === "in") {
+        if (open) result.push({ user_id, date: format(parseISO(open.timestamp), "yyyy-MM-dd"), nsr: open.nsr, kind: "entrada_sem_saida" });
+        open = p;
+      } else if (open) {
+        open = null;
+      } else {
+        result.push({ user_id, date, nsr: p.nsr, kind: "saida_sem_entrada" });
+      }
+      prev = p;
+    }
+    if (open) result.push({ user_id, date: format(parseISO(open.timestamp), "yyyy-MM-dd"), nsr: open.nsr, kind: "entrada_sem_saida" });
+  }
+  return result.sort((a, b) => a.nsr - b.nsr);
+};
+
+/** Marcação com NSR e código gravados pelo banco (migration 003). */
+export interface PersistedPunch extends PunchRecord {
+  nsr: number;
+  prev_hash: string;
+  record_hash: string;
+  server_received_at: string | null;
+  clock_offset_seconds: number | null;
+}
+
+/** Mesma forma de data que o banco usa no código de integridade: ISO em UTC com milissegundos. */
+export const canonicalTimestamp = (ts: string) => new Date(ts).toISOString();
+
+/** Divergência do relógio do aparelho acima da qual a marcação é sinalizada (segundos). */
+export const CLOCK_TOLERANCE_SECONDS = 300;
+
+export const hasClockDivergence = (p: Pick<PersistedPunch, "clock_offset_seconds">) =>
+  p.clock_offset_seconds !== null && Math.abs(p.clock_offset_seconds) > CLOCK_TOLERANCE_SECONDS;
+
+/**
+ * Confere as marcações gravadas, em ordem de NSR: cada código deve bater com os dados e cada `prev_hash`
+ * com o código anterior (a primeira da lista é aceita como ponto de partida). Devolve o NSR divergente ou null.
+ */
+export const verifyPersisted = async (rows: PersistedPunch[], cnpj: string): Promise<number | null> => {
+  const sorted = [...rows].sort((a, b) => a.nsr - b.nsr);
+  for (let i = 0; i < sorted.length; i++) {
+    const p = sorted[i];
+    if (i > 0 && p.prev_hash !== sorted[i - 1].record_hash) return p.nsr;
+    const expected = await sha256Hex(
+      [p.prev_hash, p.nsr, onlyDigits(cnpj), p.user_id, canonicalTimestamp(p.timestamp), p.type].join("|"),
+    );
+    if (expected !== p.record_hash) return p.nsr;
+  }
+  return null;
+};

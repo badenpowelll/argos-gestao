@@ -4,12 +4,13 @@ import InstallAppBanner from "@/components/InstallAppBanner";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
-import { MapPin, LayoutDashboard, Clock, Shield, LogOut, FileEdit, CalendarDays, CloudOff, RefreshCw, LifeBuoy } from "lucide-react";
+import { MapPin, LayoutDashboard, Users, Clock, Shield, LogOut, FileEdit, CalendarDays, CloudOff, RefreshCw, LifeBuoy } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 
 const allNavItems = [
   { to: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ["owner", "admin", "manager"] },
   { to: "/app", icon: Clock, label: "Ponto", end: true, roles: ["owner", "admin", "manager", "employee"] },
+  { to: "/app/gestor", icon: Users, label: "Gestor", roles: ["owner", "admin", "manager"] },
   { to: "/app/my-punches", icon: CalendarDays, label: "Meu Ponto", roles: ["owner", "admin", "manager", "employee"] },
   { to: "/app/adjustments", icon: FileEdit, label: "Ajustes", roles: ["owner", "admin", "manager", "employee"] },
   { to: "/app/admin", icon: Shield, label: "Admin", roles: ["owner", "admin"] },

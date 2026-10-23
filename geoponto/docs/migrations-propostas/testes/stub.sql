@@ -1,0 +1,21 @@
+do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+create schema auth;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.uid', true),'')::uuid $$;
+create type public.app_role as enum ('owner','admin','manager','employee');
+create type public.punch_type as enum ('in','out');
+create type public.punch_status as enum ('verified','outside_perimeter','flagged','pending');
+create type public.sync_status as enum ('synced','pending','failed');
+create type public.adjustment_status as enum ('pending','approved','rejected');
+create table public.companies(id uuid primary key default gen_random_uuid(), name text, cnpj text);
+create table public.profiles(user_id uuid primary key, company_id uuid);
+create table public.user_roles(user_id uuid, role public.app_role);
+create function public.has_role(_user_id uuid, _role public.app_role) returns boolean language sql stable as $$ select exists(select 1 from user_roles where user_id=_user_id and role=_role) $$;
+create function public.get_user_company_id() returns uuid language sql stable as $$ select company_id from profiles where user_id=auth.uid() $$;
+create table public.time_entries(id uuid primary key default gen_random_uuid(), user_id uuid, company_id uuid, timestamp timestamptz, type public.punch_type, status public.punch_status default 'pending', sync_status public.sync_status default 'pending');
+create table public.adjustments(id uuid primary key default gen_random_uuid(), user_id uuid not null, company_id uuid, date date not null, reason text default 'x', status public.adjustment_status default 'pending', approved_by uuid, punch_step text, proposed_time text);
+create table public.absence_justifications(id uuid primary key default gen_random_uuid(), user_id uuid, company_id uuid, date date not null);
+create table public.audit_logs(id uuid primary key default gen_random_uuid(), user_id uuid, company_id uuid, action text not null, metadata jsonb, snapshot_before jsonb, snapshot_after jsonb);
+insert into companies(id,name,cnpj) values ('00000000-0000-0000-0000-00000000000c','Empresa A','12.345.678/0001-90'),('00000000-0000-0000-0000-00000000000d','Empresa B','98.765.432/0001-10');
+-- u1 funcionário A, m1 gestor A, h1 admin A, h2 admin A, x1 admin B
+insert into profiles values ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-00000000000c'),('00000000-0000-0000-0000-0000000000a1','00000000-0000-0000-0000-00000000000c'),('00000000-0000-0000-0000-0000000000b1','00000000-0000-0000-0000-00000000000c'),('00000000-0000-0000-0000-0000000000b2','00000000-0000-0000-0000-00000000000c'),('00000000-0000-0000-0000-0000000000c1','00000000-0000-0000-0000-00000000000d');
+insert into user_roles values ('00000000-0000-0000-0000-000000000001','employee'),('00000000-0000-0000-0000-0000000000a1','manager'),('00000000-0000-0000-0000-0000000000b1','admin'),('00000000-0000-0000-0000-0000000000b2','admin'),('00000000-0000-0000-0000-0000000000c1','admin');

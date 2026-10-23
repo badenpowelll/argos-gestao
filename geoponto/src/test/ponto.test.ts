@@ -44,3 +44,79 @@ describe("fechamento mensal", () => {
     expect(hasInconsistency([{ timestamp: "2025-03-03T08:00:00", type: "in" }])).toBe(true);
   });
 });
+
+import { findAnomalies } from "@/utils/portaria671";
+
+describe("anomalias de marcação", () => {
+  const mk = async (rows: [string, "in" | "out"][]) =>
+    buildChain(rows.map(([ts, type], i) => ({ id: String(i), user_id: "u1", timestamp: ts, type })), "12345678000190");
+
+  it("não aponta nada em jornada completa", async () => {
+    const chain = await mk([
+      ["2025-03-10T11:00:00.000Z", "in"],
+      ["2025-03-10T15:00:00.000Z", "out"],
+      ["2025-03-10T16:00:00.000Z", "in"],
+      ["2025-03-10T20:00:00.000Z", "out"],
+    ]);
+    expect(findAnomalies(chain)).toEqual([]);
+  });
+  it("aponta entrada sem saída, saída sem entrada e duplicada", async () => {
+    const chain = await mk([
+      ["2025-03-10T11:00:00.000Z", "in"],
+      ["2025-03-10T11:00:30.000Z", "in"], // duplicada
+      ["2025-03-11T11:00:00.000Z", "in"], // a de 10/03 ficou sem saída
+      ["2025-03-11T15:00:00.000Z", "out"],
+      ["2025-03-12T15:00:00.000Z", "out"], // saída sem entrada
+    ]);
+    const kinds = findAnomalies(chain).map((a) => a.kind);
+    expect(kinds).toContain("marcacao_duplicada");
+    expect(kinds).toContain("entrada_sem_saida");
+    expect(kinds).toContain("saida_sem_entrada");
+  });
+});
+
+import { verifyPersisted, sha256Hex, canonicalTimestamp, hasClockDivergence, GENESIS_HASH, type PersistedPunch } from "@/utils/portaria671";
+import { isValidCpf, formatCpf, maskCpf } from "@/utils/cpf";
+
+describe("marcações gravadas (migration 003)", () => {
+  const make = async (): Promise<PersistedPunch[]> => {
+    const rows: PersistedPunch[] = [];
+    let prev = GENESIS_HASH;
+    for (const [i, [ts, type]] of ([["2025-03-10T11:00:00.000Z", "in"], ["2025-03-10T15:00:00.123Z", "out"]] as const).entries()) {
+      const nsr = i + 6; // continua após 5 registros legados
+      const hash = await sha256Hex([prev, nsr, "12345678000190", "u1", canonicalTimestamp(ts), type].join("|"));
+      rows.push({ id: String(i), user_id: "u1", timestamp: ts, type, nsr, prev_hash: prev, record_hash: hash, server_received_at: ts, clock_offset_seconds: 0 });
+      prev = hash;
+    }
+    return rows;
+  };
+  it("aceita a cadeia íntegra e aponta adulteração", async () => {
+    const rows = await make();
+    expect(await verifyPersisted(rows, "12.345.678/0001-90")).toBeNull();
+    rows[1] = { ...rows[1], timestamp: "2025-03-10T16:00:00.000Z" };
+    expect(await verifyPersisted(rows, "12.345.678/0001-90")).toBe(7);
+  });
+  it("aponta elo quebrado entre registros", async () => {
+    const rows = await make();
+    rows[1] = { ...rows[1], prev_hash: "x" };
+    expect(await verifyPersisted(rows, "12.345.678/0001-90")).toBe(7);
+  });
+  it("sinaliza relógio divergente acima de 5 minutos", () => {
+    expect(hasClockDivergence({ clock_offset_seconds: 7200 })).toBe(true);
+    expect(hasClockDivergence({ clock_offset_seconds: -299 })).toBe(false);
+    expect(hasClockDivergence({ clock_offset_seconds: null })).toBe(false);
+  });
+});
+
+describe("CPF", () => {
+  it("valida dígitos verificadores", () => {
+    expect(isValidCpf("529.982.247-25")).toBe(true);
+    expect(isValidCpf("52998224726")).toBe(false);
+    expect(isValidCpf("111.111.111-11")).toBe(false);
+    expect(isValidCpf("123")).toBe(false);
+  });
+  it("formata e mascara", () => {
+    expect(formatCpf("52998224725")).toBe("529.982.247-25");
+    expect(maskCpf("52998224725")).toBe("529.***.***-25");
+  });
+});

@@ -51,6 +51,8 @@ import EmployeeReport from "@/components/EmployeeReport";
 import RegistrationRequests from "@/components/RegistrationRequests";
 import EmployeeCards from "@/components/EmployeeCards";
 import AbsenceManagement from "@/components/AbsenceManagement";
+import { approveAdjustment } from "@/utils/adjustments";
+import LaborData from "@/components/LaborData";
 import MonthlyClosingPanel from "@/components/MonthlyClosing";
 import Portaria671Panel from "@/components/Portaria671Panel";
 const Profile = lazy(() => import("./Profile"));
@@ -80,7 +82,7 @@ interface CNPJData {
 
 const Admin = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"menu" | "team" | "company" | "audit" | "register" | "adjustments" | "reports" | "requests" | "profile" | "facial" | "employees" | "absences" | "closing" | "portaria">("menu");
+  const [activeTab, setActiveTab] = useState<"menu" | "team" | "company" | "audit" | "register" | "adjustments" | "reports" | "requests" | "profile" | "facial" | "employees" | "absences" | "closing" | "portaria" | "laboral">("menu");
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<any[]>([]);
   const [geofences, setGeofences] = useState<any[]>([]);
@@ -370,6 +372,7 @@ const Admin = () => {
     { key: "reports" as const, label: "Relatórios", icon: BarChart3, color: "text-orange-500", bgColor: "bg-orange-50", description: "Visualização e exportação de dados" },
     { key: "requests" as const, label: "Solicitações", icon: Inbox, color: "text-pink-500", bgColor: "bg-pink-50", description: "Pedidos de alteração e solicitações" },
     { key: "closing" as const, label: "Fechamento", icon: CalendarCheck, color: "text-indigo-600", bgColor: "bg-indigo-50", description: "Apuração mensal e exportação para folha" },
+    { key: "laboral" as const, label: "Dados trabalhistas", icon: UserCog, color: "text-emerald-600", bgColor: "bg-emerald-50", description: "CPF, matrícula e admissão dos funcionários" },
     { key: "portaria" as const, label: "Portaria 671", icon: Shield, color: "text-slate-600", bgColor: "bg-slate-50", description: "AFD, NSR e integridade dos registros" },
     { key: "absences" as const, label: "Abonos", icon: CalendarCheck, color: "text-lime-600", bgColor: "bg-lime-50", description: "Justificativas de faltas e atestados" },
     { key: "profile" as const, label: "Perfil", icon: UserCog, color: "text-teal-600", bgColor: "bg-teal-50", description: "Configurações da sua conta" },
@@ -993,45 +996,15 @@ const Admin = () => {
                 rejected: "text-rose-700 bg-rose-100",
               };
               const handleApprove = async () => {
-                const { error } = await supabase
-                  .from("adjustments")
-                  .update({ status: "approved", approved_by: user!.id })
-                  .eq("id", adj.id);
-                if (error) {
-                  toast.error("Erro ao aprovar: " + error.message);
-                } else {
-                  const dateStr = adj.date;
-                  const timeStr = adj.proposed_time || "08:00:00";
-                  const timestamp = `${dateStr}T${timeStr}`;
-                  const punchType = adj.punch_step === "entrada" || adj.punch_step === "retorno_almoco" ? "in" : "out";
-                  await supabase.from("time_entries").insert({
-                    user_id: adj.user_id,
-                    company_id: adj.company_id,
-                    type: punchType as "in" | "out",
-                    timestamp,
-                    status: "verified",
-                    sync_status: "synced",
-                  });
-                  setPendingAdjustments((prev) =>
-                    prev.map((a) => (a.id === adj.id ? { ...a, status: "approved" } : a))
-                  );
-                  // Auditoria: registra quem aprovou e o snapshot do ajuste.
-                  await supabase.from("audit_logs").insert({
-                    user_id: user!.id,
-                    company_id: adj.company_id,
-                    action: "adjustment_approved",
-                    metadata: {
-                      adjustment_id: adj.id,
-                      target_user_id: adj.user_id,
-                      date: adj.date,
-                      punch_step: adj.punch_step,
-                      proposed_time: adj.proposed_time,
-                    },
-                    snapshot_before: { status: "pending" },
-                    snapshot_after: { status: "approved", approved_by: user!.id },
-                  });
-                  toast.success("Ajuste aprovado e ponto registrado!");
+                const result = await approveAdjustment(adj, user!.id);
+                if (!result.ok) {
+                  toast.error(result.message);
+                  return;
                 }
+                setPendingAdjustments((prev) =>
+                  prev.map((a) => (a.id === adj.id ? { ...a, status: "approved" } : a))
+                );
+                toast.success("Ajuste aprovado e ponto registrado!");
               };
               const handleReject = () => {
                 setRejectingAdjId(adj.id);
@@ -1140,6 +1113,11 @@ const Admin = () => {
       {activeTab === "closing" && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <MonthlyClosingPanel companyId={companyId} employees={employees} />
+        </motion.div>
+      )}
+      {activeTab === "laboral" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <LaborData companyId={companyId} />
         </motion.div>
       )}
       {activeTab === "portaria" && (

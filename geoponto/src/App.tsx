@@ -18,6 +18,7 @@ import AppLayout from "./layouts/AppLayout";
 import PunchPage from "./pages/Punch";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
+import ManagerPanel from "./pages/ManagerPanel";
 import EmployeeRegister from "./pages/EmployeeRegister";
 import Adjustments from "./pages/Adjustments";
 import MyPunches from "./pages/MyPunches";
@@ -54,6 +55,7 @@ const App = () => (
               <Route index element={<PunchPage />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="admin" element={<Admin />} />
+              <Route path="gestor" element={<ManagerPanel />} />
               {/* Employee registration is now inside Admin */}
               <Route path="adjustments" element={<Adjustments />} />
               <Route path="my-punches" element={<MyPunches />} />

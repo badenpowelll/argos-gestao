@@ -8,17 +8,20 @@ import { Loader2, Download, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { closeMonth, closingToCsv, downloadFile, type MonthClosing } from "@/utils/monthlyClosing";
+import ClosingWorkflow from "@/components/ClosingWorkflow";
 import { formatMinutes } from "@/utils/timeCalculations";
 
 interface Props {
   companyId: string | null;
   employees: { user_id: string; name: string; company_id: string | null }[];
+  /** Gestor não enxerga abonos de outros (RLS): as faltas podem estar superestimadas. */
+  absencesPartial?: boolean;
 }
 
-const MonthlyClosingPanel = ({ companyId, employees }: Props) => {
+const MonthlyClosingPanel = ({ companyId, employees, absencesPartial = false }: Props) => {
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
   const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState<{ name: string; closing: MonthClosing }[]>([]);
+  const [rows, setRows] = useState<{ user_id: string; name: string; closing: MonthClosing }[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState(0);
 
   const run = async () => {
@@ -47,7 +50,7 @@ const MonthlyClosingPanel = ({ companyId, employees }: Props) => {
       team.map((e) => {
         const entries = (entriesRes.data ?? []).filter((t) => t.user_id === e.user_id) as { timestamp: string; type: "in" | "out" }[];
         const justified = new Set((absRes.data ?? []).filter((a) => a.user_id === e.user_id).map((a) => a.date));
-        return { name: e.name, closing: closeMonth(ref, entries, dailyHours, justified) };
+        return { user_id: e.user_id, name: e.name, closing: closeMonth(ref, entries, dailyHours, justified) };
       }),
     );
   };
@@ -71,6 +74,11 @@ const MonthlyClosingPanel = ({ companyId, employees }: Props) => {
             </Button>
           )}
         </div>
+        {rows.length > 0 && absencesPartial && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+            Seu perfil não enxerga os abonos cadastrados pelo RH. Faltas abonadas podem aparecer como falta; confirme com o RH antes de fechar.
+          </div>
+        )}
         {rows.length > 0 && (pendingAdjustments > 0 || alerts > 0) && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
             <AlertTriangle className="h-4 w-4 mt-0.5" />
@@ -108,6 +116,17 @@ const MonthlyClosingPanel = ({ companyId, employees }: Props) => {
             </TableBody>
           </Table>
         </div>
+        {rows.length > 0 && (
+          <ClosingWorkflow
+            companyId={companyId}
+            month={month}
+            snapshot={rows.map(({ user_id, name, closing: c }) => ({
+              user_id, name, expected: c.expected, worked: c.worked, extra: c.extra, deficit: c.deficit,
+              balance: c.balance, absences: c.absences, inconsistencies: c.inconsistencies,
+              days: c.days.filter((d) => d.worked > 0 || d.expected > 0).map((d) => ({ date: d.dateKey, expected: d.expected, worked: d.worked, extra: d.extra, deficit: d.deficit, absent: d.absent, justified: d.justified, inconsistent: d.inconsistent })),
+            }))}
+          />
+        )}
       </CardContent>
     </Card>
   );
