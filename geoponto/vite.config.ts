@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  // Publicação (Railway): `vite preview` serve o dist em 0.0.0.0 e aceita o domínio público.
+  preview: {
+    host: "0.0.0.0",
+    allowedHosts: true,
+  },
   plugins: [
     react(),
     mode === "development" && componentTagger(),
