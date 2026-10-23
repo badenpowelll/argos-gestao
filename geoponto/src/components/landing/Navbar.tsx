@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { MapPin, LogIn } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,7 +9,7 @@ const Navbar = () => {
     <nav className="fixed top-0 z-50 w-full border-b border-primary-foreground/10 bg-primary/95 backdrop-blur">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-2 font-bold text-primary-foreground">
-          <MapPin className="h-5 w-5" />
+          <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-md" />
           <span>GeoPonto</span>
         </div>
 

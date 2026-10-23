@@ -1,6 +1,6 @@
 import { MapPin, Phone, Mail, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import argosLogo from "@/assets/argos-logo.jfif";
+import argosLogo from "@/assets/argos-logo.jpg";
 
 const Footer = () => {
   return (
@@ -25,7 +25,7 @@ const Footer = () => {
 
           {/* Argos Soluções */}
           <div className="flex flex-col items-center gap-3">
-            <img src={argosLogo} alt="Argos Soluções" className="h-10 w-auto rounded" />
+            <img src={argosLogo} alt="Argos Soluções" className="h-14 w-auto" />
             <p className="text-sm font-semibold text-foreground">Argos Soluções®</p>
             <div className="space-y-1 text-xs text-muted-foreground">
               <p className="flex items-center gap-1.5">

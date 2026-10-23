@@ -56,7 +56,7 @@ const BenefitsSection = () => {
     <section className="bg-secondary py-20 md:py-28">
       <div className="container mx-auto px-4">
         <div className="mx-auto mb-16 max-w-2xl text-center">
-          <h2 className="mb-4 text-3xl font-bold text-foreground md:text-4xl">
+          <h2 className="mb-4 text-3xl font-bold uppercase text-foreground md:text-4xl">
             Por que escolher o <span className="text-primary">GeoPonto</span>?
           </h2>
           <p className="text-muted-foreground">

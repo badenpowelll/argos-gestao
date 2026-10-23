@@ -5,7 +5,7 @@ const CTASection = () => {
   return (
     <section className="bg-primary py-20">
       <div className="container mx-auto px-4 text-center">
-        <h2 className="mb-4 text-3xl font-bold text-primary-foreground md:text-4xl">
+        <h2 className="mb-4 text-3xl font-bold uppercase text-primary-foreground md:text-4xl">
           Pronto para modernizar seu controle de ponto?
         </h2>
         <p className="mx-auto mb-8 max-w-xl text-primary-foreground/80">

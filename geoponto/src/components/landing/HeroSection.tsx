@@ -29,7 +29,7 @@ const HeroSection = () => {
             Controle de ponto inteligente
           </div>
 
-          <h1 className="mb-6 text-4xl font-black leading-tight tracking-tight text-primary-foreground md:text-6xl">
+          <h1 className="mb-6 text-4xl font-bold uppercase leading-tight tracking-tight text-primary-foreground md:text-6xl">
             Sistema de Ponto Eletrônico{" "}
             <span className="text-accent">Inteligente</span>
           </h1>

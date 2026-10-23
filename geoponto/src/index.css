@@ -10,83 +10,85 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* Argos Design System — cores oficiais: Navy #000F37, Orange #FF5D00, Rust #B02500, Gray #D1D2D2 */
+    --background: 214 31% 97%;
+    --foreground: 224 100% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 224 100% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 224 100% 11%;
 
-    --primary: 224 76% 48%;
+    --primary: 224 100% 11%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 218 28% 90%;
+    --secondary-foreground: 224 100% 11%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 218 28% 92%;
+    --muted-foreground: 219 22% 36%;
 
-    --accent: 160 84% 39%;
-    --accent-foreground: 0 0% 100%;
+    /* Laranja = ação/destaque; texto navy sobre laranja (branco = 3,1:1, não usar) */
+    --accent: 22 100% 50%;
+    --accent-foreground: 224 100% 11%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 13 100% 35%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 224 76% 48%;
+    --border: 180 1% 82%;
+    --input: 180 1% 82%;
+    --ring: 220 70% 47%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 224 76% 48%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 224 100% 11%;
+    --sidebar-primary: 224 100% 11%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 224 76% 48%;
+    --sidebar-accent: 218 28% 90%;
+    --sidebar-accent-foreground: 224 100% 11%;
+    --sidebar-border: 180 1% 82%;
+    --sidebar-ring: 220 70% 47%;
   }
 
   .dark {
-    --background: 222 47% 6%;
+    --background: 224 100% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 222 47% 8%;
+    --card: 224 80% 10%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222 47% 8%;
+    --popover: 224 80% 10%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 224 76% 48%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 22 100% 50%;
+    --primary-foreground: 224 100% 11%;
 
-    --secondary: 217 33% 17%;
+    --secondary: 224 50% 18%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 224 50% 18%;
+    --muted-foreground: 218 25% 70%;
 
-    --accent: 160 84% 39%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 22 100% 50%;
+    --accent-foreground: 224 100% 11%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 13 100% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 224 76% 48%;
+    --border: 224 50% 20%;
+    --input: 224 50% 20%;
+    --ring: 220 80% 65%;
 
-    --sidebar-background: 222 47% 6%;
+    --sidebar-background: 224 100% 7%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 224 76% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
+    --sidebar-primary: 22 100% 50%;
+    --sidebar-primary-foreground: 224 100% 11%;
+    --sidebar-accent: 224 50% 18%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 224 76% 48%;
+    --sidebar-border: 224 50% 20%;
+    --sidebar-ring: 220 80% 65%;
   }
 }
 
