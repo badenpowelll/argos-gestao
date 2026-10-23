@@ -5,7 +5,7 @@ Ordem do pacote de 14 prompts, ajustada pela auditoria (P = prioridade). Cada et
 | Etapa | Prompt | Situação | Ajuste recomendado |
 |---|---|---|---|
 | 0 | 01 Auditoria | ✅ este conjunto (comparativo pendente de acesso) | obter acesso a Betices/Faceponto |
-| 1 | **Correções de segurança urgentes** (novo) | ❌ | A3 bucket privado; honestidade do "facial"; trigger anti-edição |
+| 1 | **Correções de segurança urgentes** (novo) | ❌ | ~~bucket privado~~ (já é privado); **remover/limitar UPDATE em `time_entries`**; honestidade do "facial"; trigger anti-edição |
 | 2 | 02 Arquitetura | 🟡 | partir de `ARQUITETURA…` já proposto (GeoPonto = jornada; Argos Gestão = contratos/financeiro) |
 | 3 | 03 Colaboradores | ❌ | pré-requisito de folha: CPF, matrícula, admissão, estabelecimento |
 | 4 | 05 Jornada/escala/banco | 🟡 | escalas com horários; livro do banco; intrajornada |
@@ -22,5 +22,5 @@ Ordem do pacote de 14 prompts, ajustada pela auditoria (P = prioridade). Cada et
 1. Acesso a Betices e Faceponto (ou código do Betices).
 2. Sistema de folha/contabilidade de destino e acesso.
 3. CCTs/ACTs, acordos de banco de horas, contratos com cláusulas de glosa, tabela de rubricas.
-4. Autorização para: tornar o bucket `avatars` privado (migration), definir política de retenção de fotos.
+4. Autorização para: migration de aprovação atômica de ajuste e leitura de abonos pelo gestor (`geoponto/docs/migrations-propostas/001`), restringir UPDATE em `time_entries`, definir retenção de fotos.
 5. Escolha do modelo de reconhecimento facial (ver custo, LGPD e hospedagem).
